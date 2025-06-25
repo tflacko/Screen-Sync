@@ -70,4 +70,4 @@ Follow standard Git workflow with feature branches. All changes require test cov
 
 ## License
 
-MIT
+none
