@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Moon, Sun, Globe, Megaphone, Wallet, MapPin, ArrowRight, Shield, Users, BarChart3, Plus, Search, Eye, Clock, DollarSign } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Moon, Sun, Globe, Megaphone, Wallet, MapPin, ArrowRight, Shield, Users, BarChart3, Plus, Search, Eye, Clock, DollarSign, AlertCircle } from 'lucide-react';
 
 const ScreenSyncDApp = () => {
   const [darkMode, setDarkMode] = useState(true);
@@ -8,7 +8,10 @@ const ScreenSyncDApp = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [userType, setUserType] = useState('');
-  const [isVisionMode, setIsVisionMode] = useState(true); // New: Vision vs Reality toggle
+  const [isVisionMode, setIsVisionMode] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [userData, setUserData] = useState({
     wallet: '',
     type: '',
@@ -56,6 +59,25 @@ const ScreenSyncDApp = () => {
     }
   ];
 
+  // Persist non-sensitive preferences
+  useEffect(() => {
+    const savedPrefs = localStorage.getItem('screenSyncPrefs');
+    if (savedPrefs) {
+      try {
+        const prefs = JSON.parse(savedPrefs);
+        if (prefs.darkMode !== undefined) setDarkMode(prefs.darkMode);
+        if (prefs.isVisionMode !== undefined) setIsVisionMode(prefs.isVisionMode);
+      } catch (e) {
+        console.error('Failed to load preferences:', e);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const prefs = { darkMode, isVisionMode };
+    localStorage.setItem('screenSyncPrefs', JSON.stringify(prefs));
+  }, [darkMode, isVisionMode]);
+
   // Mode selection handler
   const handleModeSelection = (isDark) => {
     setDarkMode(isDark);
@@ -77,6 +99,24 @@ const ScreenSyncDApp = () => {
     setShowDashboard(true);
   };
 
+  // Error component
+  const ErrorMessage = ({ message, onDismiss }) => (
+    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start space-x-3">
+      <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+      <div className="flex-1">
+        <p className="text-sm text-red-800 dark:text-red-200">{message}</p>
+      </div>
+      {onDismiss && (
+        <button
+          onClick={onDismiss}
+          className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200"
+        >
+          ×
+        </button>
+      )}
+    </div>
+  );
+
   // Mode Selection Component
   const ModeSelection = () => (
     <div className={`fixed inset-0 z-50 flex items-center justify-center ${bgClass}`}>
@@ -92,7 +132,8 @@ const ScreenSyncDApp = () => {
         <div className="grid grid-cols-2 gap-4 mb-6">
           <button
             onClick={() => handleModeSelection(false)}
-            className="p-4 rounded-xl border-2 border-gray-300 hover:border-red-600 transition-all duration-300"
+            className="p-4 rounded-xl border-2 border-gray-300 hover:border-red-600 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2"
+            aria-label="Select light mode"
           >
             <Sun className="w-8 h-8 mx-auto mb-2 text-yellow-500" />
             <span className="text-sm font-medium">Light Mode</span>
@@ -100,7 +141,8 @@ const ScreenSyncDApp = () => {
           
           <button
             onClick={() => handleModeSelection(true)}
-            className="p-4 rounded-xl border-2 border-gray-300 hover:border-red-600 transition-all duration-300"
+            className="p-4 rounded-xl border-2 border-gray-300 hover:border-red-600 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2"
+            aria-label="Select dark mode"
           >
             <Moon className="w-8 h-8 mx-auto mb-2 text-blue-400" />
             <span className="text-sm font-medium">Dark Mode</span>
@@ -265,28 +307,46 @@ const ScreenSyncDApp = () => {
     });
     const [isConnecting, setIsConnecting] = useState(false);
     const [walletConnected, setWalletConnected] = useState(false);
+    const [walletError, setWalletError] = useState(null);
 
     const connectWallet = async () => {
       setIsConnecting(true);
+      setWalletError(null);
+      
       try {
         // Check if Phantom wallet is available
-        if (window.solana && window.solana.isPhantom) {
-          const response = await window.solana.connect();
-          const walletAddress = response.publicKey.toString();
-          setFormData({...formData, wallet: walletAddress});
-          setWalletConnected(true);
-          
-          // Record wallet connection to smart contract
-          console.log('Recording wallet connection to governance contract: governance_4mklqzb7u');
-          // In production, this would call the smart contract to register the user
-        } else {
-          alert('Please install Phantom Wallet to continue');
+        const { solana } = window;
+        
+        if (!solana) {
+          setWalletError('Please install Phantom Wallet to continue');
           setIsConnecting(false);
           return;
         }
+        
+        if (!solana.isPhantom) {
+          setWalletError('Please install Phantom Wallet to continue');
+          setIsConnecting(false);
+          return;
+        }
+
+        // Connect to Phantom
+        const response = await solana.connect();
+        const walletAddress = response.publicKey.toString();
+        
+        setFormData({...formData, wallet: walletAddress});
+        setWalletConnected(true);
+        
+        // TODO: Integrate with actual smart contract
+        console.log('Wallet connected:', walletAddress);
+        console.log('Ready to integrate with governance contract: governance_4mklqzb7u');
+        
       } catch (error) {
         console.error('Wallet connection failed:', error);
-        setIsConnecting(false);
+        if (error.code === 4001) {
+          setWalletError('Connection request was rejected');
+        } else {
+          setWalletError('Failed to connect wallet. Please try again.');
+        }
       } finally {
         setIsConnecting(false);
       }
@@ -294,7 +354,7 @@ const ScreenSyncDApp = () => {
 
     const handleSubmit = () => {
       if (!walletConnected) {
-        alert('Please connect your wallet first');
+        setWalletError('Please connect your wallet first');
         return;
       }
       handleOnboardingComplete(formData);
@@ -327,13 +387,20 @@ const ScreenSyncDApp = () => {
           </div>
 
           <div className="space-y-6">
+            {walletError && (
+              <ErrorMessage 
+                message={walletError} 
+                onDismiss={() => setWalletError(null)} 
+              />
+            )}
+
             <div>
               <label className="block text-sm font-medium mb-2">Solana Wallet Connection *</label>
               {!walletConnected ? (
                 <button
                   onClick={connectWallet}
                   disabled={isConnecting}
-                  className="w-full p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-red-600 dark:hover:border-red-400 transition-colors flex items-center justify-center space-x-3"
+                  className="w-full p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-red-600 dark:hover:border-red-400 transition-colors flex items-center justify-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Wallet className="w-6 h-6 text-gray-400" />
                   <span className="text-lg">
@@ -343,10 +410,10 @@ const ScreenSyncDApp = () => {
               ) : (
                 <div className="w-full p-4 bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-600 rounded-lg flex items-center justify-between">
                   <div className="flex items-center space-x-3">
-                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
                     <span className="font-medium">Wallet Connected</span>
                   </div>
-                  <span className="text-sm text-gray-600 dark:text-gray-300">
+                  <span className="text-sm text-gray-600 dark:text-gray-300 font-mono">
                     {formData.wallet.slice(0, 8)}...{formData.wallet.slice(-4)}
                   </span>
                 </div>
@@ -389,20 +456,60 @@ const ScreenSyncDApp = () => {
     );
   };
 
-  // Dashboard Component
-  const Dashboard = () => {
-    const [searchTerm, setSearchTerm] = useState('');
-
-    // Different content based on user type
-    if (userType === 'owner') {
-      return <AdSpaceOwnerDashboard />;
-    } else {
-      return <MarketplaceDashboard />;
-    }
-  };
-
   // Ad Space Owner Dashboard
   const AdSpaceOwnerDashboard = () => {
+    const [formData, setFormData] = useState({
+      spaceType: '',
+      displaySize: '',
+      location: '',
+      price: '',
+      impressions: '',
+      restrictions: ''
+    });
+    const [errors, setErrors] = useState({});
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const validateForm = () => {
+      const newErrors = {};
+      
+      if (!formData.spaceType) {
+        newErrors.spaceType = 'Please select a space type';
+      }
+      
+      if (!formData.displaySize || !/^\d+x\d+$/.test(formData.displaySize)) {
+        newErrors.displaySize = 'Format must be: 1920x1080';
+      }
+      
+      if (!formData.location) {
+        newErrors.location = 'Location is required';
+      }
+      
+      if (!formData.price || parseFloat(formData.price) <= 0) {
+        newErrors.price = 'Price must be greater than 0';
+      }
+      
+      if (!formData.impressions || parseInt(formData.impressions) <= 0) {
+        newErrors.impressions = 'Impressions must be greater than 0';
+      }
+      
+      setErrors(newErrors);
+      return Object.keys(newErrors).length === 0;
+    };
+
+    const handleSubmit = async () => {
+      if (!validateForm()) return;
+      
+      setIsSubmitting(true);
+      // TODO: Submit to smart contract
+      console.log('Submitting ad space listing:', formData);
+      
+      // Simulate submission
+      setTimeout(() => {
+        setIsSubmitting(false);
+        alert('Ad space listing created successfully!');
+      }, 2000);
+    };
+
     return (
       <div className={`min-h-screen ${bgClass}`}>
         {/* Header */}
@@ -497,32 +604,56 @@ const ScreenSyncDApp = () => {
                 <h3 className="text-lg font-semibold mb-4">Space Details</h3>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium mb-2">Space Type</label>
-                    <select className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-transparent">
-                      <option>Digital Billboard</option>
-                      <option>Website Banner</option>
-                      <option>Mobile App Space</option>
-                      <option>Social Media</option>
-                      <option>Physical Screen</option>
+                    <label className="block text-sm font-medium mb-2">Space Type *</label>
+                    <select 
+                      className={`w-full p-3 border rounded-lg bg-transparent ${
+                        errors.spaceType ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
+                      }`}
+                      value={formData.spaceType}
+                      onChange={(e) => setFormData({...formData, spaceType: e.target.value})}
+                    >
+                      <option value="">Select a type</option>
+                      <option value="billboard">Digital Billboard</option>
+                      <option value="website">Website Banner</option>
+                      <option value="mobile">Mobile App Space</option>
+                      <option value="social">Social Media</option>
+                      <option value="physical">Physical Screen</option>
                     </select>
+                    {errors.spaceType && (
+                      <p className="text-red-500 text-sm mt-1">{errors.spaceType}</p>
+                    )}
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium mb-2">Display Size</label>
+                    <label className="block text-sm font-medium mb-2">Display Size *</label>
                     <input 
                       type="text" 
                       placeholder="1920x1080" 
-                      className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-transparent"
+                      className={`w-full p-3 border rounded-lg bg-transparent ${
+                        errors.displaySize ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
+                      }`}
+                      value={formData.displaySize}
+                      onChange={(e) => setFormData({...formData, displaySize: e.target.value})}
                     />
+                    {errors.displaySize && (
+                      <p className="text-red-500 text-sm mt-1">{errors.displaySize}</p>
+                    )}
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium mb-2">Location</label>
+                    <label className="block text-sm font-medium mb-2">Location *</label>
                     <input 
                       type="text" 
                       placeholder="New York, Times Square" 
-                      className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-transparent"
+                      className={`w-full p-3 border rounded-lg bg-transparent ${
+                        errors.location ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
+                      }`}
+                      value={formData.location}
+                      onChange={(e) => setFormData({...formData, location: e.target.value})}
                     />
+                    {errors.location && (
+                      <p className="text-red-500 text-sm mt-1">{errors.location}</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -531,28 +662,45 @@ const ScreenSyncDApp = () => {
                 <h3 className="text-lg font-semibold mb-4">Pricing & Availability</h3>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium mb-2">Base Price (SOL/week)</label>
+                    <label className="block text-sm font-medium mb-2">Base Price (SOL/week) *</label>
                     <input 
                       type="number" 
+                      step="0.1"
                       placeholder="2.5" 
-                      className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-transparent"
+                      className={`w-full p-3 border rounded-lg bg-transparent ${
+                        errors.price ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
+                      }`}
+                      value={formData.price}
+                      onChange={(e) => setFormData({...formData, price: e.target.value})}
                     />
+                    {errors.price && (
+                      <p className="text-red-500 text-sm mt-1">{errors.price}</p>
+                    )}
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium mb-2">Monthly Impressions</label>
+                    <label className="block text-sm font-medium mb-2">Monthly Impressions *</label>
                     <input 
                       type="number" 
                       placeholder="1000000" 
-                      className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-transparent"
+                      className={`w-full p-3 border rounded-lg bg-transparent ${
+                        errors.impressions ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
+                      }`}
+                      value={formData.impressions}
+                      onChange={(e) => setFormData({...formData, impressions: e.target.value})}
                     />
+                    {errors.impressions && (
+                      <p className="text-red-500 text-sm mt-1">{errors.impressions}</p>
+                    )}
                   </div>
                   
                   <div>
                     <label className="block text-sm font-medium mb-2">Content Restrictions</label>
                     <textarea 
                       placeholder="No adult content, gambling, or political ads"
-                      className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-transparent h-20"
+                      className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-transparent h-20 resize-none"
+                      value={formData.restrictions}
+                      onChange={(e) => setFormData({...formData, restrictions: e.target.value})}
                     />
                   </div>
                 </div>
@@ -560,8 +708,19 @@ const ScreenSyncDApp = () => {
             </div>
 
             <div className="mt-8 flex justify-center">
-              <button className="bg-red-600 text-white px-8 py-3 rounded-lg hover:bg-red-700 transition-colors font-semibold">
-                List Ad Space on Network
+              <button 
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="bg-red-600 text-white px-8 py-3 rounded-lg hover:bg-red-700 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Creating Listing...</span>
+                  </>
+                ) : (
+                  <span>List Ad Space on Network</span>
+                )}
               </button>
             </div>
           </div>
@@ -572,7 +731,16 @@ const ScreenSyncDApp = () => {
 
   // P2P Marketplace Dashboard
   const MarketplaceDashboard = () => {
-    const [searchTerm, setSearchTerm] = useState('');
+    // Filter listings based on search term
+    const filteredListings = useMemo(() => {
+      if (!searchTerm.trim()) return mockListings;
+      
+      const lowercaseSearch = searchTerm.toLowerCase();
+      return mockListings.filter(listing => 
+        listing.title.toLowerCase().includes(lowercaseSearch) ||
+        listing.location.toLowerCase().includes(lowercaseSearch)
+      );
+    }, [searchTerm]);
 
     const AdSpaceCard = ({ listing }) => (
       <div className={`rounded-xl border overflow-hidden hover:shadow-xl transition-all duration-300 ${cardBg}`}>
@@ -581,19 +749,20 @@ const ScreenSyncDApp = () => {
             src={listing.image} 
             alt={listing.title}
             className="w-full h-48 object-cover"
+            loading="lazy"
           />
           <div className="absolute top-3 right-3">
             <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
               listing.available 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-red-100 text-red-800'
+                ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200' 
+                : 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200'
             }`}>
               {listing.available ? 'Available' : 'Booked'}
             </span>
           </div>
           {!isVisionMode && (
             <div className="absolute top-3 left-3">
-              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-semibold">
+              <span className="bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200 px-2 py-1 rounded-full text-xs font-semibold">
                 Vision Preview
               </span>
             </div>
@@ -605,15 +774,15 @@ const ScreenSyncDApp = () => {
           
           <div className="space-y-2 mb-4 text-sm text-gray-600 dark:text-gray-400">
             <div className="flex items-center">
-              <MapPin className="w-4 h-4 mr-2 text-red-600" />
+              <MapPin className="w-4 h-4 mr-2 text-red-600 flex-shrink-0" />
               {listing.location}
             </div>
             <div className="flex items-center">
-              <Eye className="w-4 h-4 mr-2 text-red-600" />
+              <Eye className="w-4 h-4 mr-2 text-red-600 flex-shrink-0" />
               {listing.views.toLocaleString()} views/month
             </div>
             <div className="flex items-center">
-              <Clock className="w-4 h-4 mr-2 text-red-600" />
+              <Clock className="w-4 h-4 mr-2 text-red-600 flex-shrink-0" />
               {listing.duration} days minimum
             </div>
           </div>
@@ -627,9 +796,15 @@ const ScreenSyncDApp = () => {
               className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
                 listing.available && isVisionMode
                   ? 'bg-red-600 text-white hover:bg-red-700'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
               }`}
               disabled={!listing.available || !isVisionMode}
+              onClick={() => {
+                if (listing.available && isVisionMode) {
+                  console.log('Booking space:', listing.id);
+                  // TODO: Implement booking logic
+                }
+              }}
             >
               {!isVisionMode ? 'Coming Soon' : listing.available ? 'Book Now' : 'Unavailable'}
             </button>
@@ -638,21 +813,28 @@ const ScreenSyncDApp = () => {
       </div>
     );
 
-    const emptyState = (
+    const EmptyState = () => (
       <div className="text-center py-16">
         <div className="w-24 h-24 mx-auto mb-6 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
           <Plus className="w-12 h-12 text-gray-400" />
         </div>
-        <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">No Live Ad Spaces Yet</h3>
+        <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+          {searchTerm ? 'No Results Found' : 'No Live Ad Spaces Yet'}
+        </h3>
         <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
-          Be the first to list your ad space on our network! Switch to Vision Mode to see what's coming.
+          {searchTerm 
+            ? `No ad spaces match "${searchTerm}". Try a different search.`
+            : 'Be the first to list your ad space on our network! Switch to Vision Mode to see what\'s coming.'
+          }
         </p>
-        <button 
-          onClick={() => setIsVisionMode(true)}
-          className="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition-colors"
-        >
-          View Our Vision
-        </button>
+        {!searchTerm && (
+          <button 
+            onClick={() => setIsVisionMode(true)}
+            className="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition-colors"
+          >
+            View Our Vision
+          </button>
+        )}
       </div>
     );
 
@@ -756,7 +938,7 @@ const ScreenSyncDApp = () => {
           {isVisionMode && (
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
               <div className={`p-6 rounded-xl ${cardBg} border`}>
-                <div className="text-2xl font-bold text-red-600 mb-2">{mockListings.length}</div>
+                <div className="text-2xl font-bold text-red-600 mb-2">{filteredListings.length}</div>
                 <div className="text-gray-600 dark:text-gray-400">Available Spaces</div>
               </div>
               <div className={`p-6 rounded-xl ${cardBg} border`}>
@@ -776,36 +958,31 @@ const ScreenSyncDApp = () => {
 
           {/* Content */}
           {isVisionMode ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {mockListings.map(listing => (
-                <AdSpaceCard key={listing.id} listing={listing} />
-              ))}
-            </div>
+            filteredListings.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredListings.map(listing => (
+                  <AdSpaceCard key={listing.id} listing={listing} />
+                ))}
+              </div>
+            ) : (
+              <EmptyState />
+            )
           ) : (
-            emptyState
+            <EmptyState />
           )}
         </main>
       </div>
     );
   };
-            <div className={`p-6 rounded-xl ${cardBg} border`}>
-              <div className="text-2xl font-bold text-red-600 mb-2">500M+</div>
-              <div className="text-gray-600 dark:text-gray-400">Monthly Views</div>
-            </div>
-            <div className={`p-6 rounded-xl ${cardBg} border`}>
-              <div className="text-2xl font-bold text-red-600 mb-2">4.8★</div>
-              <div className="text-gray-600 dark:text-gray-400">Avg Rating</div>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {mockListings.map(listing => (
-              <AdSpaceCard key={listing.id} listing={listing} />
-            ))}
-          </div>
-        </main>
-      </div>
-    );
+  // Main Dashboard Component
+  const Dashboard = () => {
+    // Different content based on user type
+    if (userType === 'owner') {
+      return <AdSpaceOwnerDashboard />;
+    } else {
+      return <MarketplaceDashboard />;
+    }
   };
 
   return (
