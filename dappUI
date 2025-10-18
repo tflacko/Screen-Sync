@@ -1,998 +1,1230 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Moon, Sun, Globe, Megaphone, Wallet, MapPin, ArrowRight, Shield, Users, BarChart3, Plus, Search, Eye, Clock, DollarSign, AlertCircle } from 'lucide-react';
+import React, { useState, useCallback, useMemo, createContext, useContext, useEffect } from 'react';
+import { Moon, Sun, Globe, Megaphone, Wallet, MapPin, Shield, Users, DollarSign, AlertCircle, TrendingUp, Zap, Lock, X, Calendar, Activity, ChevronRight, Gamepad2, Loader2, Store, LayoutGrid, ArrowUpDown, Clock, FileText, Image, BarChart } from 'lucide-react';
 
-const ScreenSyncDApp = () => {
-  const [darkMode, setDarkMode] = useState(true);
-  const [showModeSelection, setShowModeSelection] = useState(true);
-  const [showUserTypeSelection, setShowUserTypeSelection] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [showDashboard, setShowDashboard] = useState(false);
-  const [userType, setUserType] = useState('');
-  const [isVisionMode, setIsVisionMode] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [userData, setUserData] = useState({
-    wallet: '',
-    type: '',
-    location: ''
-  });
+// ============ SOLANA TYPES ============
+interface AdSpaceListing {
+  publicKey: string;
+  owner: string;
+  title: string;
+  location: string;
+  pricePerDay: bigint;
+  minimumDays: number;
+  displaySize: string;
+  trafficDescription: string; // Descriptive text about traffic/audience
+  isAvailable: boolean;
+  isVirtual: boolean;
+  imageUrl: string;
+  createdAt: number;
+  lastModified: number;
+  category: 'billboard' | 'website' | 'mobile' | 'social' | 'physical' | 'virtual';
+  blackoutDates?: number[]; // Unix timestamps of unavailable dates
+  availabilityFlexibility?: 'high' | 'medium' | 'low'; // Owner's flexibility for scheduling
+}
 
-  // Theme configuration
-  const bgClass = darkMode ? 'bg-gray-950 text-white' : 'bg-gray-50 text-gray-900';
-  const cardBg = darkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200';
+interface CampaignContract {
+  listingPubkey: string;
+  advertiserPubkey: string;
+  startDate: number;
+  endDate: number;
+  totalAmount: bigint;
+  timeSlots: number[];
+  displayFrequency: number; // Times per hour
+  contentType: 'image' | 'video' | 'interactive';
+  status: 'pending' | 'active' | 'completed' | 'cancelled';
+  escrowAccount: string;
+}
 
-  // Mock marketplace data
-  const mockListings = [
-    {
-      id: 1,
-      title: "Times Square Digital Billboard",
-      location: "New York, NY",
-      price: 2.5,
-      size: "1920x1080",
-      duration: 7,
-      views: 1250000,
-      available: true,
-      image: "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?w=400&h=300&fit=crop"
-    },
-    {
-      id: 2,
-      title: "London Eye LED Screen",
-      location: "London, UK", 
-      price: 1.8,
-      size: "1280x720",
-      duration: 14,
-      views: 890000,
-      available: true,
-      image: "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=300&fit=crop"
-    },
-    {
-      id: 3,
-      title: "Tokyo Shibuya Crossing",
-      location: "Tokyo, Japan",
-      price: 3.2,
-      size: "1920x1080", 
-      duration: 30,
-      views: 2100000,
-      available: false,
-      image: "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=400&h=300&fit=crop"
+// ============ CONSTANTS ============
+const LAMPORTS_PER_SOL = 1_000_000_000n;
+const PROGRAM_ID = 'marketplace_qutpcx6xm';
+const MIN_CAMPAIGN_DAYS = 7;
+const MAX_CAMPAIGN_DAYS = 90;
+const PLATFORM_FEE_BPS = 250;
+
+// ============ UTILITY FUNCTIONS ============
+const solToLamports = (sol: number): bigint => {
+  return BigInt(Math.floor(sol * Number(LAMPORTS_PER_SOL)));
+};
+
+const lamportsToSol = (lamports: bigint): number => {
+  return Number(lamports) / Number(LAMPORTS_PER_SOL);
+};
+
+const formatSol = (lamports: bigint): string => {
+  return lamportsToSol(lamports).toFixed(4);
+};
+
+// ============ WALLET CONTEXT ============
+interface WalletContextType {
+  connected: boolean;
+  publicKey: string | null;
+  connecting: boolean;
+  disconnect: () => void;
+  connect: () => Promise<void>;
+  signTransaction: (tx: any) => Promise<any>;
+  error: string | null;
+}
+
+const WalletContext = createContext<WalletContextType>({
+  connected: false,
+  publicKey: null,
+  connecting: false,
+  disconnect: () => {},
+  connect: async () => {},
+  signTransaction: async (tx) => tx,
+  error: null
+});
+
+// ============ CALENDAR COMPONENT ============
+interface CalendarProps {
+  selectedDates: Date[];
+  onDateSelect: (date: Date) => void;
+  blackoutDates?: number[];
+  minDate?: Date;
+  maxDate?: Date;
+}
+
+const Calendar: React.FC<CalendarProps> = ({ 
+  selectedDates, 
+  onDateSelect, 
+  blackoutDates = [],
+  minDate = new Date(),
+  maxDate
+}) => {
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const days = [];
+    
+    // Add empty cells for days before month starts
+    for (let i = 0; i < firstDay.getDay(); i++) {
+      days.push(null);
     }
-  ];
-
-  // Persist non-sensitive preferences
-  useEffect(() => {
-    const savedPrefs = localStorage.getItem('screenSyncPrefs');
-    if (savedPrefs) {
-      try {
-        const prefs = JSON.parse(savedPrefs);
-        if (prefs.darkMode !== undefined) setDarkMode(prefs.darkMode);
-        if (prefs.isVisionMode !== undefined) setIsVisionMode(prefs.isVisionMode);
-      } catch (e) {
-        console.error('Failed to load preferences:', e);
-      }
+    
+    // Add all days of the month
+    for (let i = 1; i <= lastDay.getDate(); i++) {
+      days.push(new Date(year, month, i));
     }
-  }, []);
-
-  useEffect(() => {
-    const prefs = { darkMode, isVisionMode };
-    localStorage.setItem('screenSyncPrefs', JSON.stringify(prefs));
-  }, [darkMode, isVisionMode]);
-
-  // Mode selection handler
-  const handleModeSelection = (isDark) => {
-    setDarkMode(isDark);
-    setShowModeSelection(false);
-    setShowUserTypeSelection(true);
+    
+    return days;
   };
-
-  // User type selection handler
-  const handleUserTypeSelection = (type) => {
-    setUserType(type);
-    setShowUserTypeSelection(false);
-    setShowOnboarding(true);
-  };
-
-  // Onboarding completion handler
-  const handleOnboardingComplete = (data) => {
-    setUserData(data);
-    setShowOnboarding(false);
-    setShowDashboard(true);
-  };
-
-  // Error component
-  const ErrorMessage = ({ message, onDismiss }) => (
-    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start space-x-3">
-      <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-      <div className="flex-1">
-        <p className="text-sm text-red-800 dark:text-red-200">{message}</p>
-      </div>
-      {onDismiss && (
-        <button
-          onClick={onDismiss}
-          className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200"
-        >
-          ×
-        </button>
-      )}
-    </div>
-  );
-
-  // Mode Selection Component
-  const ModeSelection = () => (
-    <div className={`fixed inset-0 z-50 flex items-center justify-center ${bgClass}`}>
-      <div className="absolute inset-0 bg-black bg-opacity-50"></div>
-      <div className={`relative z-10 p-8 rounded-2xl border max-w-md w-full mx-4 ${cardBg}`}>
-        <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold mb-2">Welcome to Screen Sync</h2>
-          <p className="text-gray-600 dark:text-gray-400 text-sm">
-            Choose your preferred theme to get started
-          </p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <button
-            onClick={() => handleModeSelection(false)}
-            className="p-4 rounded-xl border-2 border-gray-300 hover:border-red-600 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2"
-            aria-label="Select light mode"
-          >
-            <Sun className="w-8 h-8 mx-auto mb-2 text-yellow-500" />
-            <span className="text-sm font-medium">Light Mode</span>
-          </button>
-          
-          <button
-            onClick={() => handleModeSelection(true)}
-            className="p-4 rounded-xl border-2 border-gray-300 hover:border-red-600 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2"
-            aria-label="Select dark mode"
-          >
-            <Moon className="w-8 h-8 mx-auto mb-2 text-blue-400" />
-            <span className="text-sm font-medium">Dark Mode</span>
-          </button>
-        </div>
-
-        <div className="flex items-start space-x-2 text-xs text-gray-500 dark:text-gray-400">
-          <Shield className="w-4 h-4 mt-0.5 flex-shrink-0" />
-          <p>
-            <strong>Transparency Notice:</strong> Ad space owners are responsible for content approval and display. 
-            All user data is stored on-chain for complete transparency.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-
-  // User Type Selection Component
-  const UserTypeSelection = () => {
-    const [hoveredType, setHoveredType] = useState('');
-
-    return (
-      <div className={`min-h-screen flex items-center justify-center ${bgClass} p-4`}>
-        <div className="max-w-4xl w-full">
-          <button
-            onClick={() => {
-              setShowUserTypeSelection(false);
-              setShowModeSelection(true);
-            }}
-            className="mb-8 flex items-center space-x-2 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-300 transition-colors"
-          >
-            <ArrowRight className="w-4 h-4 rotate-180" />
-            <span>Back to mode selection</span>
-          </button>
-
-          <div className="text-center mb-12">
-            <div className="mb-6">
-              <h1 className="text-5xl font-bold mb-4" style={{fontFamily: 'Noto Sans, sans-serif', color: '#960000'}}>
-                Screen Sync
-              </h1>
-            </div>
-            <h1 className="text-4xl font-bold mb-4">Choose Your Path</h1>
-            <p className="text-xl text-gray-600 dark:text-gray-400">
-              How would you like to use Screen Sync?
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-8">
-            <div
-              className={`relative p-8 rounded-2xl border-2 cursor-pointer transition-all duration-300 transform hover:scale-105 ${
-                hoveredType === 'creator' 
-                  ? 'border-red-600 bg-red-50 dark:bg-red-900/30' 
-                  : 'border-gray-300 dark:border-gray-700'
-              } ${cardBg}`}
-              onMouseEnter={() => setHoveredType('creator')}
-              onMouseLeave={() => setHoveredType('')}
-              onClick={() => handleUserTypeSelection('creator')}
-            >
-              <div className="text-center">
-                <div className={`w-16 h-16 mx-auto mb-4 rounded-xl flex items-center justify-center ${
-                  hoveredType === 'creator' ? 'bg-red-600' : 'bg-gray-100 dark:bg-gray-800'
-                }`}>
-                  <Megaphone className={`w-8 h-8 ${hoveredType === 'creator' ? 'text-white' : 'text-red-600'}`} />
-                </div>
-                
-                <h3 className="text-2xl font-bold mb-2">
-                  <span className={hoveredType === 'creator' ? 'text-gray-900 dark:text-white' : ''}>
-                    {hoveredType === 'creator' ? 'View P2P Marketplace' : 'Be seen ANYWHERE'}
-                  </span>
-                </h3>
-                
-                <p className={`mb-6 ${hoveredType === 'creator' ? 'text-gray-700 dark:text-gray-200' : 'text-gray-600 dark:text-gray-400'}`}>
-                  {hoveredType === 'creator' 
-                    ? 'Browse premium ad spaces and launch your campaigns globally'
-                    : 'Launch campaigns on premium ad spaces worldwide'
-                  }
-                </p>
-                
-                <div className={`space-y-3 text-sm ${hoveredType === 'creator' ? 'text-gray-700 dark:text-gray-200' : 'text-gray-600 dark:text-gray-400'}`}>
-                  <div className="flex items-center space-x-2">
-                    <Globe className="w-4 h-4 text-red-600" />
-                    <span>Global marketplace access</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <BarChart3 className="w-4 h-4 text-red-600" />
-                    <span>Real-time analytics</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Shield className="w-4 h-4 text-red-600" />
-                    <span>AI content compliance</span>
-                  </div>
-                </div>
-              </div>
-              
-              <ArrowRight className={`absolute bottom-4 right-4 w-6 h-6 transition-all duration-300 ${
-                hoveredType === 'creator' ? 'text-red-600 dark:text-red-500 translate-x-1' : 'text-gray-400'
-              }`} />
-            </div>
-
-            <div
-              className={`relative p-8 rounded-2xl border-2 cursor-pointer transition-all duration-300 transform hover:scale-105 ${
-                hoveredType === 'owner' 
-                  ? 'border-red-600 bg-red-50 dark:bg-red-900/30' 
-                  : 'border-gray-300 dark:border-gray-700'
-              } ${cardBg}`}
-              onMouseEnter={() => setHoveredType('owner')}
-              onMouseLeave={() => setHoveredType('')}
-              onClick={() => handleUserTypeSelection('owner')}
-            >
-              <div className="text-center">
-                <div className={`w-16 h-16 mx-auto mb-4 rounded-xl flex items-center justify-center ${
-                  hoveredType === 'owner' ? 'bg-red-600' : 'bg-gray-100 dark:bg-gray-800'
-                }`}>
-                  <Users className={`w-8 h-8 ${hoveredType === 'owner' ? 'text-white' : 'text-red-600'}`} />
-                </div>
-                
-                <h3 className="text-2xl font-bold mb-2">
-                  <span className={hoveredType === 'owner' ? 'text-gray-900 dark:text-white' : ''}>
-                    {hoveredType === 'owner' ? 'Monetize Your Ad-Space' : 'Join a Global Network'}
-                  </span>
-                </h3>
-                
-                <p className={`mb-6 ${hoveredType === 'owner' ? 'text-gray-700 dark:text-gray-200' : 'text-gray-600 dark:text-gray-400'}`}>
-                  {hoveredType === 'owner' 
-                    ? 'List your ad spaces and earn revenue from global advertisers'
-                    : 'Connect your ad spaces to a worldwide marketplace'
-                  }
-                </p>
-                
-                <div className={`space-y-3 text-sm ${hoveredType === 'owner' ? 'text-gray-700 dark:text-gray-200' : 'text-gray-600 dark:text-gray-400'}`}>
-                  <div className="flex items-center space-x-2">
-                    <DollarSign className="w-4 h-4 text-red-600" />
-                    <span>Direct P2P revenue</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Globe className="w-4 h-4 text-red-600" />
-                    <span>Global advertiser network</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Shield className="w-4 h-4 text-red-600" />
-                    <span>Content control</span>
-                  </div>
-                </div>
-              </div>
-              
-              <ArrowRight className={`absolute bottom-4 right-4 w-6 h-6 transition-all duration-300 ${
-                hoveredType === 'owner' ? 'text-red-600 dark:text-red-500 translate-x-1' : 'text-gray-400'
-              }`} />
-            </div>
-          </div>
-        </div>
-      </div>
+  
+  const isDateSelected = (date: Date) => {
+    return selectedDates.some(d => 
+      d.toDateString() === date.toDateString()
     );
   };
-
-  // Onboarding Component
-  const Onboarding = () => {
-    const [formData, setFormData] = useState({
-      wallet: '',
-      type: userType,
-      location: ''
-    });
-    const [isConnecting, setIsConnecting] = useState(false);
-    const [walletConnected, setWalletConnected] = useState(false);
-    const [walletError, setWalletError] = useState(null);
-
-    const connectWallet = async () => {
-      setIsConnecting(true);
-      setWalletError(null);
-      
-      try {
-        // Check if Phantom wallet is available
-        const { solana } = window;
-        
-        if (!solana) {
-          setWalletError('Please install Phantom Wallet to continue');
-          setIsConnecting(false);
-          return;
-        }
-        
-        if (!solana.isPhantom) {
-          setWalletError('Please install Phantom Wallet to continue');
-          setIsConnecting(false);
-          return;
-        }
-
-        // Connect to Phantom
-        const response = await solana.connect();
-        const walletAddress = response.publicKey.toString();
-        
-        setFormData({...formData, wallet: walletAddress});
-        setWalletConnected(true);
-        
-        // TODO: Integrate with actual smart contract
-        console.log('Wallet connected:', walletAddress);
-        console.log('Ready to integrate with governance contract: governance_4mklqzb7u');
-        
-      } catch (error) {
-        console.error('Wallet connection failed:', error);
-        if (error.code === 4001) {
-          setWalletError('Connection request was rejected');
-        } else {
-          setWalletError('Failed to connect wallet. Please try again.');
-        }
-      } finally {
-        setIsConnecting(false);
-      }
-    };
-
-    const handleSubmit = () => {
-      if (!walletConnected) {
-        setWalletError('Please connect your wallet first');
-        return;
-      }
-      handleOnboardingComplete(formData);
-    };
-
-    return (
-      <div className={`min-h-screen flex items-center justify-center ${bgClass} p-4`}>
-        <div className={`max-w-md w-full p-8 rounded-2xl border ${cardBg}`}>
-          <button
-            onClick={() => {
-              setShowOnboarding(false);
-              setShowUserTypeSelection(true);
-            }}
-            className="mb-6 flex items-center space-x-2 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-300 transition-colors"
-          >
-            <ArrowRight className="w-4 h-4 rotate-180" />
-            <span>Back to user type</span>
-          </button>
-
-          <div className="text-center mb-8">
-            <div className="mb-6">
-              <h1 className="text-3xl font-bold mb-4" style={{fontFamily: 'Noto Sans, sans-serif', color: '#960000'}}>
-                Screen Sync
-              </h1>
-            </div>
-            <h2 className="text-2xl font-bold mb-2">Connect Your Wallet</h2>
-            <p className="text-gray-600 dark:text-gray-400">
-              Join the decentralized advertising revolution
-            </p>
-          </div>
-
-          <div className="space-y-6">
-            {walletError && (
-              <ErrorMessage 
-                message={walletError} 
-                onDismiss={() => setWalletError(null)} 
-              />
-            )}
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Solana Wallet Connection *</label>
-              {!walletConnected ? (
-                <button
-                  onClick={connectWallet}
-                  disabled={isConnecting}
-                  className="w-full p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-red-600 dark:hover:border-red-400 transition-colors flex items-center justify-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Wallet className="w-6 h-6 text-gray-400" />
-                  <span className="text-lg">
-                    {isConnecting ? 'Connecting...' : 'Connect Wallet'}
-                  </span>
-                </button>
-              ) : (
-                <div className="w-full p-4 bg-green-50 dark:bg-green-900/20 border-2 border-green-300 dark:border-green-600 rounded-lg flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                    <span className="font-medium">Wallet Connected</span>
-                  </div>
-                  <span className="text-sm text-gray-600 dark:text-gray-300 font-mono">
-                    {formData.wallet.slice(0, 8)}...{formData.wallet.slice(-4)}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Location (Optional)</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Your location"
-                  className="w-full p-3 pl-10 border border-gray-300 dark:border-gray-700 rounded-lg bg-transparent focus:ring-2 focus:ring-red-600 focus:border-transparent"
-                  value={formData.location}
-                  onChange={(e) => setFormData({...formData, location: e.target.value})}
-                />
-                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              </div>
-            </div>
-
-            <button
-              onClick={handleSubmit}
-              disabled={!walletConnected}
-              className={`w-full py-3 rounded-lg font-semibold transition-colors flex items-center justify-center space-x-2 ${
-                walletConnected 
-                  ? 'bg-red-600 text-white hover:bg-red-700' 
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }`}
-            >
-              <span>Enter Screen Sync</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-4 text-center">
-            Data stored on-chain for transparency. No personal information is collected.
-          </p>
-        </div>
-      </div>
-    );
+  
+  const isDateBlocked = (date: Date) => {
+    const timestamp = date.getTime();
+    return blackoutDates.includes(timestamp) || 
+           date < minDate || 
+           (maxDate && date > maxDate);
   };
-
-  // Ad Space Owner Dashboard
-  const AdSpaceOwnerDashboard = () => {
-    const [formData, setFormData] = useState({
-      spaceType: '',
-      displaySize: '',
-      location: '',
-      price: '',
-      impressions: '',
-      restrictions: ''
-    });
-    const [errors, setErrors] = useState({});
-    const [isSubmitting, setIsSubmitting] = useState(false);
-
-    const validateForm = () => {
-      const newErrors = {};
-      
-      if (!formData.spaceType) {
-        newErrors.spaceType = 'Please select a space type';
-      }
-      
-      if (!formData.displaySize || !/^\d+x\d+$/.test(formData.displaySize)) {
-        newErrors.displaySize = 'Format must be: 1920x1080';
-      }
-      
-      if (!formData.location) {
-        newErrors.location = 'Location is required';
-      }
-      
-      if (!formData.price || parseFloat(formData.price) <= 0) {
-        newErrors.price = 'Price must be greater than 0';
-      }
-      
-      if (!formData.impressions || parseInt(formData.impressions) <= 0) {
-        newErrors.impressions = 'Impressions must be greater than 0';
-      }
-      
-      setErrors(newErrors);
-      return Object.keys(newErrors).length === 0;
-    };
-
-    const handleSubmit = async () => {
-      if (!validateForm()) return;
-      
-      setIsSubmitting(true);
-      // TODO: Submit to smart contract
-      console.log('Submitting ad space listing:', formData);
-      
-      // Simulate submission
-      setTimeout(() => {
-        setIsSubmitting(false);
-        alert('Ad space listing created successfully!');
-      }, 2000);
-    };
-
-    return (
-      <div className={`min-h-screen ${bgClass}`}>
-        {/* Header */}
-        <header className={`border-b ${darkMode ? 'border-gray-900' : 'border-gray-200'}`}>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
-              <div className="flex items-center space-x-4">
-                <h1 className="text-xl font-bold" style={{fontFamily: 'Noto Sans, sans-serif', color: '#960000'}}>
-                  Screen Sync
-                </h1>
-                <span className="text-sm text-gray-500">Ad Space Owner Portal</span>
-              </div>
-              
-              <div className="flex items-center space-x-4">
-                <button
-                  onClick={() => {
-                    setShowDashboard(false);
-                    setShowUserTypeSelection(true);
-                  }}
-                  className="text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-300 transition-colors"
-                >
-                  ← Switch User Type
-                </button>
-                
-                <button
-                  onClick={() => setDarkMode(!darkMode)}
-                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                >
-                  {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-                </button>
-                
-                <div className="flex items-center space-x-2 bg-gray-100 dark:bg-gray-800 px-3 py-2 rounded-lg">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-sm font-medium">
-                    {userData.wallet ? `${userData.wallet.slice(0, 4)}...${userData.wallet.slice(-4)}` : 'Connected'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Hero Section */}
-          <div className="text-center mb-12">
-            <h1 className="text-4xl font-bold mb-4">Monetize Your Ad Space</h1>
-            <p className="text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto">
-              Connect your screens, websites, and digital properties to our global advertising network.
-              Earn revenue from premium advertisers worldwide.
-            </p>
-          </div>
-
-          {/* Benefits Grid */}
-          <div className="grid md:grid-cols-3 gap-8 mb-12">
-            <div className={`p-6 rounded-xl ${cardBg} border text-center`}>
-              <div className="w-16 h-16 mx-auto mb-4 bg-green-100 dark:bg-green-900/20 rounded-xl flex items-center justify-center">
-                <DollarSign className="w-8 h-8 text-green-600" />
-              </div>
-              <h3 className="text-xl font-bold mb-2">Direct Revenue</h3>
-              <p className="text-gray-600 dark:text-gray-400">
-                Keep 97.5% of earnings. No middlemen, no hidden fees. Get paid directly in SOL or $SSC tokens.
-              </p>
-            </div>
-
-            <div className={`p-6 rounded-xl ${cardBg} border text-center`}>
-              <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 dark:bg-blue-900/20 rounded-xl flex items-center justify-center">
-                <Globe className="w-8 h-8 text-blue-600" />
-              </div>
-              <h3 className="text-xl font-bold mb-2">Global Reach</h3>
-              <p className="text-gray-600 dark:text-gray-400">
-                Access advertisers from around the world. Our AI matches your space with the highest-paying campaigns.
-              </p>
-            </div>
-
-            <div className={`p-6 rounded-xl ${cardBg} border text-center`}>
-              <div className="w-16 h-16 mx-auto mb-4 bg-purple-100 dark:bg-purple-900/20 rounded-xl flex items-center justify-center">
-                <Shield className="w-8 h-8 text-purple-600" />
-              </div>
-              <h3 className="text-xl font-bold mb-2">Full Control</h3>
-              <p className="text-gray-600 dark:text-gray-400">
-                You decide what content appears on your space. AI pre-screens for compliance, you make the final call.
-              </p>
-            </div>
-          </div>
-
-          {/* Configuration Section */}
-          <div className={`p-8 rounded-xl ${cardBg} border`}>
-            <h2 className="text-2xl font-bold mb-6">Configure Your Ad Space</h2>
-            
-            <div className="grid md:grid-cols-2 gap-8">
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Space Details</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Space Type *</label>
-                    <select 
-                      className={`w-full p-3 border rounded-lg bg-transparent ${
-                        errors.spaceType ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
-                      }`}
-                      value={formData.spaceType}
-                      onChange={(e) => setFormData({...formData, spaceType: e.target.value})}
-                    >
-                      <option value="">Select a type</option>
-                      <option value="billboard">Digital Billboard</option>
-                      <option value="website">Website Banner</option>
-                      <option value="mobile">Mobile App Space</option>
-                      <option value="social">Social Media</option>
-                      <option value="physical">Physical Screen</option>
-                    </select>
-                    {errors.spaceType && (
-                      <p className="text-red-500 text-sm mt-1">{errors.spaceType}</p>
-                    )}
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Display Size *</label>
-                    <input 
-                      type="text" 
-                      placeholder="1920x1080" 
-                      className={`w-full p-3 border rounded-lg bg-transparent ${
-                        errors.displaySize ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
-                      }`}
-                      value={formData.displaySize}
-                      onChange={(e) => setFormData({...formData, displaySize: e.target.value})}
-                    />
-                    {errors.displaySize && (
-                      <p className="text-red-500 text-sm mt-1">{errors.displaySize}</p>
-                    )}
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Location *</label>
-                    <input 
-                      type="text" 
-                      placeholder="New York, Times Square" 
-                      className={`w-full p-3 border rounded-lg bg-transparent ${
-                        errors.location ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
-                      }`}
-                      value={formData.location}
-                      onChange={(e) => setFormData({...formData, location: e.target.value})}
-                    />
-                    {errors.location && (
-                      <p className="text-red-500 text-sm mt-1">{errors.location}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Pricing & Availability</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Base Price (SOL/week) *</label>
-                    <input 
-                      type="number" 
-                      step="0.1"
-                      placeholder="2.5" 
-                      className={`w-full p-3 border rounded-lg bg-transparent ${
-                        errors.price ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
-                      }`}
-                      value={formData.price}
-                      onChange={(e) => setFormData({...formData, price: e.target.value})}
-                    />
-                    {errors.price && (
-                      <p className="text-red-500 text-sm mt-1">{errors.price}</p>
-                    )}
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Monthly Impressions *</label>
-                    <input 
-                      type="number" 
-                      placeholder="1000000" 
-                      className={`w-full p-3 border rounded-lg bg-transparent ${
-                        errors.impressions ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
-                      }`}
-                      value={formData.impressions}
-                      onChange={(e) => setFormData({...formData, impressions: e.target.value})}
-                    />
-                    {errors.impressions && (
-                      <p className="text-red-500 text-sm mt-1">{errors.impressions}</p>
-                    )}
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Content Restrictions</label>
-                    <textarea 
-                      placeholder="No adult content, gambling, or political ads"
-                      className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-transparent h-20 resize-none"
-                      value={formData.restrictions}
-                      onChange={(e) => setFormData({...formData, restrictions: e.target.value})}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-8 flex justify-center">
-              <button 
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                className="bg-red-600 text-white px-8 py-3 rounded-lg hover:bg-red-700 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Creating Listing...</span>
-                  </>
-                ) : (
-                  <span>List Ad Space on Network</span>
-                )}
-              </button>
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  };
-
-  // P2P Marketplace Dashboard
-  const MarketplaceDashboard = () => {
-    // Filter listings based on search term
-    const filteredListings = useMemo(() => {
-      if (!searchTerm.trim()) return mockListings;
-      
-      const lowercaseSearch = searchTerm.toLowerCase();
-      return mockListings.filter(listing => 
-        listing.title.toLowerCase().includes(lowercaseSearch) ||
-        listing.location.toLowerCase().includes(lowercaseSearch)
-      );
-    }, [searchTerm]);
-
-    const AdSpaceCard = ({ listing }) => (
-      <div className={`rounded-xl border overflow-hidden hover:shadow-xl transition-all duration-300 ${cardBg}`}>
-        <div className="relative">
-          <img 
-            src={listing.image} 
-            alt={listing.title}
-            className="w-full h-48 object-cover"
-            loading="lazy"
-          />
-          <div className="absolute top-3 right-3">
-            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-              listing.available 
-                ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200' 
-                : 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200'
-            }`}>
-              {listing.available ? 'Available' : 'Booked'}
-            </span>
-          </div>
-          {!isVisionMode && (
-            <div className="absolute top-3 left-3">
-              <span className="bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200 px-2 py-1 rounded-full text-xs font-semibold">
-                Vision Preview
-              </span>
-            </div>
-          )}
-        </div>
-        
-        <div className="p-6">
-          <h3 className="text-lg font-bold mb-2">{listing.title}</h3>
-          
-          <div className="space-y-2 mb-4 text-sm text-gray-600 dark:text-gray-400">
-            <div className="flex items-center">
-              <MapPin className="w-4 h-4 mr-2 text-red-600 flex-shrink-0" />
-              {listing.location}
-            </div>
-            <div className="flex items-center">
-              <Eye className="w-4 h-4 mr-2 text-red-600 flex-shrink-0" />
-              {listing.views.toLocaleString()} views/month
-            </div>
-            <div className="flex items-center">
-              <Clock className="w-4 h-4 mr-2 text-red-600 flex-shrink-0" />
-              {listing.duration} days minimum
-            </div>
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-xl font-bold">{listing.price} SOL</span>
-              <span className="text-gray-600 dark:text-gray-400 text-sm">/week</span>
-            </div>
-            <button 
-              className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
-                listing.available && isVisionMode
-                  ? 'bg-red-600 text-white hover:bg-red-700'
-                  : 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-              }`}
-              disabled={!listing.available || !isVisionMode}
-              onClick={() => {
-                if (listing.available && isVisionMode) {
-                  console.log('Booking space:', listing.id);
-                  // TODO: Implement booking logic
-                }
-              }}
-            >
-              {!isVisionMode ? 'Coming Soon' : listing.available ? 'Book Now' : 'Unavailable'}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-
-    const EmptyState = () => (
-      <div className="text-center py-16">
-        <div className="w-24 h-24 mx-auto mb-6 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-          <Plus className="w-12 h-12 text-gray-400" />
-        </div>
-        <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-          {searchTerm ? 'No Results Found' : 'No Live Ad Spaces Yet'}
-        </h3>
-        <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
-          {searchTerm 
-            ? `No ad spaces match "${searchTerm}". Try a different search.`
-            : 'Be the first to list your ad space on our network! Switch to Vision Mode to see what\'s coming.'
-          }
-        </p>
-        {!searchTerm && (
-          <button 
-            onClick={() => setIsVisionMode(true)}
-            className="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition-colors"
-          >
-            View Our Vision
-          </button>
-        )}
-      </div>
-    );
-
-    return (
-      <div className={`min-h-screen ${bgClass}`}>
-        {/* Header */}
-        <header className={`border-b ${darkMode ? 'border-gray-900' : 'border-gray-200'}`}>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
-              <div className="flex items-center space-x-4">
-                <h1 className="text-xl font-bold" style={{fontFamily: 'Noto Sans, sans-serif', color: '#960000'}}>
-                  Screen Sync
-                </h1>
-                <span className="text-sm text-gray-500">P2P Marketplace</span>
-              </div>
-              
-              <div className="flex items-center space-x-4">
-                <button
-                  onClick={() => {
-                    setShowDashboard(false);
-                    setShowUserTypeSelection(true);
-                  }}
-                  className="text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-300 transition-colors"
-                >
-                  ← Switch User Type
-                </button>
-
-                {/* Vision/Reality Toggle */}
-                <div className="flex items-center space-x-3">
-                  <span className={`text-sm ${!isVisionMode ? 'text-gray-900 dark:text-white font-semibold' : 'text-gray-500'}`}>
-                    Live
-                  </span>
-                  <button
-                    onClick={() => setIsVisionMode(!isVisionMode)}
-                    className={`relative w-12 h-6 rounded-full transition-colors ${
-                      isVisionMode ? 'bg-red-600' : 'bg-gray-300 dark:bg-gray-700'
-                    }`}
-                  >
-                    <div className={`absolute w-5 h-5 bg-white rounded-full shadow transform transition-transform ${
-                      isVisionMode ? 'translate-x-6' : 'translate-x-0.5'
-                    } top-0.5`} />
-                  </button>
-                  <span className={`text-sm ${isVisionMode ? 'text-gray-900 dark:text-white font-semibold' : 'text-gray-500'}`}>
-                    Vision
-                  </span>
-                </div>
-                
-                <button
-                  onClick={() => setDarkMode(!darkMode)}
-                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                >
-                  {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-                </button>
-                
-                <div className="flex items-center space-x-2 bg-gray-100 dark:bg-gray-800 px-3 py-2 rounded-lg">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-sm font-medium">
-                    {userData.wallet ? `${userData.wallet.slice(0, 4)}...${userData.wallet.slice(-4)}` : 'Connected'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Vision/Reality Header */}
-          {isVisionMode ? (
-            <div className="text-center mb-8 p-6 bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 rounded-xl">
-              <h2 className="text-2xl font-bold text-red-800 dark:text-red-200 mb-2">🚀 Vision Mode: Our Future</h2>
-              <p className="text-red-700 dark:text-red-300">
-                Explore what Screen Sync will become - a global network of premium ad spaces
-              </p>
-            </div>
-          ) : (
-            <div className="text-center mb-8 p-6 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-xl">
-              <h2 className="text-2xl font-bold text-blue-800 dark:text-blue-200 mb-2">📡 Live Network</h2>
-              <p className="text-blue-700 dark:text-blue-300">
-                Currently active ad spaces on the Screen Sync network
-              </p>
-            </div>
-          )}
-
-          {/* Search */}
-          {isVisionMode && (
-            <div className="mb-8">
-              <div className="relative max-w-2xl">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  placeholder="Search ad spaces..."
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-red-600 focus:border-transparent bg-transparent"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Stats */}
-          {isVisionMode && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-              <div className={`p-6 rounded-xl ${cardBg} border`}>
-                <div className="text-2xl font-bold text-red-600 mb-2">{filteredListings.length}</div>
-                <div className="text-gray-600 dark:text-gray-400">Available Spaces</div>
-              </div>
-              <div className={`p-6 rounded-xl ${cardBg} border`}>
-                <div className="text-2xl font-bold text-red-600 mb-2">25+</div>
-                <div className="text-gray-600 dark:text-gray-400">Countries</div>
-              </div>
-              <div className={`p-6 rounded-xl ${cardBg} border`}>
-                <div className="text-2xl font-bold text-red-600 mb-2">500M+</div>
-                <div className="text-gray-600 dark:text-gray-400">Monthly Views</div>
-              </div>
-              <div className={`p-6 rounded-xl ${cardBg} border`}>
-                <div className="text-2xl font-bold text-red-600 mb-2">4.8★</div>
-                <div className="text-gray-600 dark:text-gray-400">Avg Rating</div>
-              </div>
-            </div>
-          )}
-
-          {/* Content */}
-          {isVisionMode ? (
-            filteredListings.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredListings.map(listing => (
-                  <AdSpaceCard key={listing.id} listing={listing} />
-                ))}
-              </div>
-            ) : (
-              <EmptyState />
-            )
-          ) : (
-            <EmptyState />
-          )}
-        </main>
-      </div>
-    );
-  };
-
-  // Main Dashboard Component
-  const Dashboard = () => {
-    // Different content based on user type
-    if (userType === 'owner') {
-      return <AdSpaceOwnerDashboard />;
-    } else {
-      return <MarketplaceDashboard />;
-    }
-  };
-
+  
+  const days = getDaysInMonth(currentMonth);
+  const monthName = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  
   return (
-    <div className={`${darkMode ? 'dark' : ''} transition-all duration-300`} style={{fontFamily: 'Noto Sans, sans-serif'}}>
-      {showModeSelection && <ModeSelection />}
-      {showUserTypeSelection && <UserTypeSelection />}
-      {showOnboarding && <Onboarding />}
-      {showDashboard && <Dashboard />}
+    <div className="bg-gray-800/50 rounded-xl p-4">
+      <div className="flex justify-between items-center mb-4">
+        <button
+          onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}
+          className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+        >
+          <ChevronRight className="w-4 h-4 rotate-180" />
+        </button>
+        <h3 className="font-semibold">{monthName}</h3>
+        <button
+          onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}
+          className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+      
+      <div className="grid grid-cols-7 gap-1 text-center text-xs text-gray-500 mb-2">
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+          <div key={day}>{day}</div>
+        ))}
+      </div>
+      
+      <div className="grid grid-cols-7 gap-1">
+        {days.map((date, idx) => (
+          <button
+            key={idx}
+            onClick={() => date && !isDateBlocked(date) && onDateSelect(date)}
+            disabled={!date || isDateBlocked(date)}
+            className={`
+              aspect-square flex items-center justify-center rounded-lg text-sm
+              ${!date ? 'invisible' : ''}
+              ${date && isDateBlocked(date) ? 'bg-gray-900/50 text-gray-600 cursor-not-allowed' : ''}
+              ${date && isDateSelected(date) ? 'bg-gradient-to-r from-red-500 to-purple-600 text-white' : ''}
+              ${date && !isDateBlocked(date) && !isDateSelected(date) ? 'hover:bg-gray-700 text-gray-300' : ''}
+            `}
+          >
+            {date?.getDate()}
+          </button>
+        ))}
+      </div>
     </div>
   );
 };
 
-export default ScreenSyncDApp;
+// ============ SOLANA SERVICE ============
+class SolanaService {
+  private connection: any;
+  
+  async fetchListings(): Promise<AdSpaceListing[]> {
+    return [
+      {
+        publicKey: 'FakeKEY1234567890abcdef',
+        owner: 'OwnerWallet123456789',
+        title: "Times Square Digital Billboard",
+        location: "New York, NY",
+        pricePerDay: solToLamports(0.357),
+        minimumDays: 7,
+        displaySize: "1920x1080",
+        trafficDescription: "High-traffic tourist and business district, peak hours 8AM-11PM, diverse international audience. Estimated 1M+ daily impressions.",
+        isAvailable: true,
+        isVirtual: false,
+        imageUrl: "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?w=400&h=300&fit=crop",
+        createdAt: Date.now(),
+        lastModified: Date.now(),
+        category: 'billboard',
+        availabilityFlexibility: 'medium'
+      },
+      {
+        publicKey: 'ShanghaiKEY567890abc',
+        owner: 'ChinaWallet456789012',
+        title: "Nanjing Road Shopping District LED",
+        location: "Shanghai, China",
+        pricePerDay: solToLamports(0.428),
+        minimumDays: 14,
+        displaySize: "2560x1440",
+        trafficDescription: "Premier shopping district, 500K+ daily foot traffic, luxury brand audience, peak 10AM-10PM. Estimated 2M+ daily impressions.",
+        isAvailable: true,
+        isVirtual: false,
+        imageUrl: "https://images.unsplash.com/photo-1548919973-5cef591cdbc9?w=400&h=300&fit=crop",
+        createdAt: Date.now(),
+        lastModified: Date.now(),
+        category: 'billboard',
+        availabilityFlexibility: 'low'
+      },
+      {
+        publicKey: 'VirtualKEY1234567890',
+        owner: 'GamingWallet987654321',
+        title: "Open World Game Billboard",
+        location: "Virtual - Gaming Metaverse",
+        pricePerDay: solToLamports(0.15),
+        minimumDays: 7,
+        displaySize: "2048x1024",
+        trafficDescription: "Active gaming community, 24/7 player engagement, primarily 18-35 demographic. Estimated 5M+ daily in-game views.",
+        isAvailable: true,
+        isVirtual: true,
+        imageUrl: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&h=300&fit=crop",
+        createdAt: Date.now(),
+        lastModified: Date.now(),
+        category: 'virtual',
+        availabilityFlexibility: 'high'
+      }
+    ];
+  }
+
+  async createCampaign(
+    listing: AdSpaceListing,
+    startDate: Date,
+    endDate: Date,
+    options: {
+      timeSlots: number[];
+      displayFrequency: number;
+      contentType: string;
+    }
+  ): Promise<{ signature: string; escrow: string }> {
+    const days = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const totalAmount = listing.pricePerDay * BigInt(days);
+    const platformFee = (totalAmount * BigInt(PLATFORM_FEE_BPS)) / 10000n;
+    const finalAmount = totalAmount + platformFee;
+    
+    console.log('Creating campaign:', {
+      listing: listing.publicKey,
+      startDate,
+      endDate,
+      days,
+      totalSOL: formatSol(finalAmount),
+      options
+    });
+    
+    return {
+      signature: 'MockSignature' + Date.now(),
+      escrow: 'EscrowPDA' + Date.now()
+    };
+  }
+  
+  async createListing(data: any): Promise<{ signature: string; listing: string }> {
+    console.log('Creating listing:', data);
+    return {
+      signature: 'ListingTx' + Date.now(),
+      listing: 'ListingPDA' + Date.now()
+    };
+  }
+}
+
+const solanaService = new SolanaService();
+
+// ============ WALLET BUTTON COMPONENT ============
+const WalletButton: React.FC = () => {
+  const { connected, publicKey, connecting, connect, disconnect } = useContext(WalletContext);
+  
+  if (connected && publicKey) {
+    return (
+      <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 px-3 py-2 rounded-xl bg-green-500/10 border border-green-500/20">
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+          <span className="text-xs font-mono">
+            {publicKey.slice(0, 4)}...{publicKey.slice(-4)}
+          </span>
+        </div>
+        <button
+          onClick={disconnect}
+          className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 transition-colors group"
+          title="Disconnect wallet"
+        >
+          <X className="w-4 h-4 text-red-500 group-hover:text-red-400" />
+        </button>
+      </div>
+    );
+  }
+  
+  return (
+    <button
+      onClick={connect}
+      disabled={connecting}
+      className={`p-2.5 rounded-xl transition-all duration-300 ${
+        connecting 
+          ? 'bg-gray-700 text-gray-500 cursor-not-allowed' 
+          : 'bg-gradient-to-r from-red-500 to-purple-600 text-white hover:shadow-lg hover:scale-105'
+      }`}
+      title="Connect wallet"
+    >
+      {connecting ? (
+        <Loader2 className="w-5 h-5 animate-spin" />
+      ) : (
+        <Wallet className="w-5 h-5" />
+      )}
+    </button>
+  );
+};
+
+// ============ ENHANCED CONTRACT BUILDER ============
+interface ContractBuilderProps {
+  listing: AdSpaceListing;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+const ContractBuilder: React.FC<ContractBuilderProps> = ({ listing, isOpen, onClose }) => {
+  const { connected, publicKey } = useContext(WalletContext);
+  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
+  const [selectedTimeSlots, setSelectedTimeSlots] = useState<number[]>([]);
+  const [displayFrequency, setDisplayFrequency] = useState(4); // Times per hour
+  const [contentType, setContentType] = useState<'image' | 'video' | 'interactive'>('image');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  const campaignDays = useMemo(() => {
+    if (!startDate || !endDate) return 0;
+    return Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  }, [startDate, endDate]);
+  
+  const totalCost = useMemo(() => {
+    if (campaignDays === 0) return 0n;
+    const baseCost = listing.pricePerDay * BigInt(campaignDays);
+    const platformFee = (baseCost * BigInt(PLATFORM_FEE_BPS)) / 10000n;
+    return baseCost + platformFee;
+  }, [listing.pricePerDay, campaignDays]);
+  
+  const handleDateSelect = (date: Date) => {
+    if (!startDate) {
+      setStartDate(date);
+      setSelectedDates([date]);
+    } else if (!endDate) {
+      if (date < startDate) {
+        setStartDate(date);
+        setEndDate(null);
+        setSelectedDates([date]);
+      } else {
+        setEndDate(date);
+        // Fill in all dates between start and end
+        const dates = [];
+        const current = new Date(startDate);
+        while (current <= date) {
+          dates.push(new Date(current));
+          current.setDate(current.getDate() + 1);
+        }
+        setSelectedDates(dates);
+      }
+    } else {
+      // Reset selection
+      setStartDate(date);
+      setEndDate(null);
+      setSelectedDates([date]);
+    }
+  };
+  
+  const handleSubmit = async () => {
+    if (!connected || !publicKey) {
+      setError('Please connect your wallet');
+      return;
+    }
+    
+    if (!startDate || !endDate) {
+      setError('Please select campaign dates');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    setError(null);
+    
+    try {
+      const result = await solanaService.createCampaign(
+        listing,
+        startDate,
+        endDate,
+        {
+          timeSlots: selectedTimeSlots,
+          displayFrequency,
+          contentType
+        }
+      );
+      
+      alert(`Campaign created! Tx: ${result.signature}`);
+      onClose();
+    } catch (err: any) {
+      setError(err.message || 'Failed to create campaign');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  if (!isOpen) return null;
+  
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 overflow-y-auto">
+      <div className="max-w-5xl w-full my-8 rounded-3xl bg-gray-900/95 backdrop-blur-xl border border-gray-700 shadow-2xl">
+        <div className="sticky top-0 z-20 p-6 border-b border-gray-700 bg-inherit rounded-t-3xl flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold mb-1 text-white">Campaign Builder</h2>
+            <p className="text-gray-400">{listing.title}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 transition-colors"
+          >
+            <X className="w-6 h-6 text-red-500" />
+          </button>
+        </div>
+        
+        <div className="p-6 grid md:grid-cols-2 gap-6">
+          {/* Left Column - Calendar and Dates */}
+          <div className="space-y-6">
+            <div className="p-6 rounded-2xl bg-gray-800/50 border border-gray-700">
+              <h3 className="text-lg font-bold mb-4 flex items-center text-white">
+                <Calendar className="w-5 h-5 mr-2 text-blue-500" />
+                Campaign Dates
+              </h3>
+              
+              <Calendar
+                selectedDates={selectedDates}
+                onDateSelect={handleDateSelect}
+                blackoutDates={listing.blackoutDates}
+                minDate={new Date()}
+                maxDate={new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)}
+              />
+              
+              <div className="mt-4 p-3 bg-gray-900/50 rounded-lg">
+                <div className="text-sm text-gray-400 space-y-1">
+                  <div className="flex justify-between">
+                    <span>Start Date:</span>
+                    <span className="text-white">
+                      {startDate ? startDate.toLocaleDateString() : 'Select date'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>End Date:</span>
+                    <span className="text-white">
+                      {endDate ? endDate.toLocaleDateString() : 'Select date'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t border-gray-700">
+                    <span>Campaign Duration:</span>
+                    <span className="text-white font-bold">
+                      {campaignDays} days
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Analytics Preview */}
+            <div className="p-6 rounded-2xl bg-gray-800/50 border border-gray-700">
+              <h3 className="text-lg font-bold mb-4 flex items-center text-white">
+                <BarChart className="w-5 h-5 mr-2 text-purple-500" />
+                Audience & Reach
+              </h3>
+              
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm text-gray-400 mb-2">Traffic Profile</p>
+                  <p className="text-sm text-gray-300">{listing.trafficDescription}</p>
+                </div>
+                <div className="pt-3 border-t border-gray-700">
+                  <p className="text-sm text-gray-400 mb-1">Campaign Duration</p>
+                  <p className="text-xl font-bold text-purple-400">
+                    {campaignDays} days selected
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Right Column - Customization Options */}
+          <div className="space-y-6">
+            {/* Time Slots */}
+            <div className="p-6 rounded-2xl bg-gray-800/50 border border-gray-700">
+              <h3 className="text-lg font-bold mb-4 flex items-center text-white">
+                <Clock className="w-5 h-5 mr-2 text-green-500" />
+                Display Schedule
+              </h3>
+              
+              <div className="grid grid-cols-2 gap-3">
+                {['Morning (6-12)', 'Afternoon (12-18)', 'Evening (18-24)', 'Night (0-6)', 'Weekdays', 'Weekends'].map((slot, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      setSelectedTimeSlots(prev => 
+                        prev.includes(idx) 
+                          ? prev.filter(s => s !== idx)
+                          : [...prev, idx]
+                      );
+                    }}
+                    className={`p-3 rounded-lg border transition-all text-sm ${
+                      selectedTimeSlots.includes(idx)
+                        ? 'bg-gradient-to-r from-red-500 to-purple-600 text-white border-transparent'
+                        : 'bg-gray-700/50 border-gray-600 text-gray-300 hover:bg-gray-700'
+                    }`}
+                  >
+                    {slot}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Display Settings */}
+            <div className="p-6 rounded-2xl bg-gray-800/50 border border-gray-700">
+              <h3 className="text-lg font-bold mb-4 flex items-center text-white">
+                <Activity className="w-5 h-5 mr-2 text-orange-500" />
+                Display Settings
+              </h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Display Frequency
+                  </label>
+                  <div className="flex items-center space-x-4">
+                    <input
+                      type="range"
+                      min="1"
+                      max="12"
+                      value={displayFrequency}
+                      onChange={(e) => setDisplayFrequency(parseInt(e.target.value))}
+                      className="flex-1"
+                    />
+                    <span className="text-white font-bold min-w-[100px]">
+                      {displayFrequency}x per hour
+                    </span>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Content Type
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { value: 'image', label: 'Image', icon: Image },
+                      { value: 'video', label: 'Video', icon: Activity },
+                      { value: 'interactive', label: 'Interactive', icon: Zap }
+                    ].map(({ value, label, icon: Icon }) => (
+                      <button
+                        key={value}
+                        onClick={() => setContentType(value as any)}
+                        className={`p-3 rounded-lg border transition-all flex flex-col items-center ${
+                          contentType === value
+                            ? 'bg-gradient-to-r from-red-500 to-purple-600 text-white border-transparent'
+                            : 'bg-gray-700/50 border-gray-600 text-gray-300 hover:bg-gray-700'
+                        }`}
+                      >
+                        <Icon className="w-4 h-4 mb-1" />
+                        <span className="text-xs">{label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Cost Summary */}
+            <div className="p-6 rounded-2xl bg-gradient-to-r from-red-500/10 to-purple-600/10 border border-red-500/20">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-white">Campaign Summary</h3>
+                <DollarSign className="w-5 h-5 text-yellow-500" />
+              </div>
+              
+              <div className="space-y-2 mb-4">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Base Cost</span>
+                  <span className="text-white">
+                    {campaignDays > 0 ? formatSol(listing.pricePerDay * BigInt(campaignDays)) : '0'} SOL
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Platform Fee ({PLATFORM_FEE_BPS / 100}%)</span>
+                  <span className="text-white">
+                    {campaignDays > 0 ? formatSol((listing.pricePerDay * BigInt(campaignDays) * BigInt(PLATFORM_FEE_BPS)) / 10000n) : '0'} SOL
+                  </span>
+                </div>
+                <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-700">
+                  <span className="text-white">Total Cost</span>
+                  <span className="bg-gradient-to-r from-red-500 to-purple-600 bg-clip-text text-transparent">
+                    {formatSol(totalCost)} SOL
+                  </span>
+                </div>
+              </div>
+              
+              {error && (
+                <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                  <p className="text-sm text-red-400">{error}</p>
+                </div>
+              )}
+              
+              <button 
+                onClick={handleSubmit}
+                disabled={isSubmitting || !connected || campaignDays === 0}
+                className={`w-full py-3 rounded-xl font-bold transition-all duration-300 ${
+                  isSubmitting || !connected || campaignDays === 0
+                    ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-red-500 to-purple-600 text-white hover:shadow-lg hover:scale-[1.02]'
+                }`}
+              >
+                {isSubmitting ? (
+                  <span className="flex items-center justify-center">
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Creating Transaction...
+                  </span>
+                ) : !connected ? (
+                  'Connect Wallet to Continue'
+                ) : campaignDays === 0 ? (
+                  'Select Campaign Dates'
+                ) : (
+                  'Deploy Campaign'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============ LISTING CARD COMPONENT ============
+interface ListingCardProps {
+  listing: AdSpaceListing;
+  onClick: () => void;
+}
+
+const ListingCard: React.FC<ListingCardProps> = ({ listing, onClick }) => {
+  const formattedPrice = formatSol(listing.pricePerDay * BigInt(listing.minimumDays));
+  
+  return (
+    <div 
+      className="group rounded-2xl border border-gray-700 overflow-hidden transition-all duration-500 hover:scale-105 hover:shadow-2xl cursor-pointer bg-gray-800/40 backdrop-blur-md"
+      onClick={onClick}
+    >
+      <div className="relative overflow-hidden">
+        <img 
+          src={listing.imageUrl} 
+          alt={listing.title}
+          className="w-full h-48 object-cover transition-transform duration-700 group-hover:scale-110"
+        />
+        
+        {listing.isVirtual && (
+          <div className="absolute top-3 left-3">
+            <span className="px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-purple-500 to-blue-500 text-white flex items-center space-x-1">
+              <Gamepad2 className="w-3 h-3" />
+              <span>Virtual</span>
+            </span>
+          </div>
+        )}
+        
+        <div className="absolute top-3 right-3">
+          <span className={`px-3 py-1 rounded-full text-xs font-bold backdrop-blur-md ${
+            listing.isAvailable 
+              ? 'bg-green-500/80 text-white' 
+              : 'bg-red-500/80 text-white'
+          }`}>
+            {listing.isAvailable ? 'Available' : 'Booked'}
+          </span>
+        </div>
+      </div>
+      
+      <div className="p-6">
+        <h3 className="text-lg font-bold mb-3 text-white">{listing.title}</h3>
+        
+        <div className="space-y-2 mb-4 text-sm text-gray-400">
+          <div className="flex items-center">
+            <MapPin className="w-4 h-4 mr-2 text-red-500" />
+            {listing.location}
+          </div>
+          <div className="flex items-start">
+            <Users className="w-4 h-4 mr-2 text-purple-500 mt-0.5 flex-shrink-0" />
+            <span className="line-clamp-2">{listing.trafficDescription}</span>
+          </div>
+        </div>
+        
+        <div className="flex items-center justify-between pt-4 border-t border-gray-700">
+          <div>
+            <span className="text-xs text-gray-500 block mb-1">Starting at</span>
+            <span className="text-2xl font-bold text-white">
+              {formattedPrice} SOL
+            </span>
+          </div>
+          <button className="px-5 py-2.5 rounded-xl font-semibold bg-gradient-to-r from-red-500 to-purple-600 text-white hover:shadow-lg hover:scale-105 transition-all flex items-center space-x-1">
+            <span>Customize</span>
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============ AD SPACE OWNER PORTAL ============
+const AdSpaceOwnerPortal: React.FC = () => {
+  const { connected } = useContext(WalletContext);
+  const [listingData, setListingData] = useState({
+    title: '',
+    spaceType: '',
+    displaySize: '',
+    pricePerDay: '',
+    location: '',
+    trafficDescription: '',
+    minDays: '7',
+    availabilityFlexibility: 'medium',
+    availableWeekdays: true,
+    availableWeekends: true,
+    blackoutDates: ''
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const handleSubmit = async () => {
+    if (!connected) {
+      alert('Please connect your wallet to list ad space');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    try {
+      const result = await solanaService.createListing({
+        ...listingData,
+        pricePerDay: solToLamports(parseFloat(listingData.pricePerDay || '0'))
+      });
+      
+      alert(`Listing created! Tx: ${result.signature}`);
+      // Reset form
+      setListingData({
+        title: '',
+        spaceType: '',
+        displaySize: '',
+        pricePerDay: '',
+        location: '',
+        trafficDescription: '',
+        minDays: '7',
+        availabilityFlexibility: 'medium',
+        availableWeekdays: true,
+        availableWeekends: true,
+        blackoutDates: ''
+      });
+    } catch (err) {
+      console.error('Failed to create listing:', err);
+      alert('Failed to create listing');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  return (
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mb-8 p-6 rounded-2xl bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/20">
+        <div className="text-center">
+          <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+            List Your Ad Space
+          </h2>
+          <p className="text-gray-400">Join the decentralized advertising revolution</p>
+        </div>
+      </div>
+      
+      <div className="grid md:grid-cols-3 gap-6 mb-12">
+        <div className="p-6 rounded-2xl bg-gray-800/40 backdrop-blur-md border border-gray-700 text-center hover:scale-105 transition-transform">
+          <DollarSign className="w-12 h-12 mx-auto mb-4 text-green-500" />
+          <h3 className="text-xl font-bold mb-2">95%+ Revenue</h3>
+          <p className="text-gray-400 text-sm">Direct P2P payments</p>
+        </div>
+        
+        <div className="p-6 rounded-2xl bg-gray-800/40 backdrop-blur-md border border-gray-700 text-center hover:scale-105 transition-transform">
+          <Globe className="w-12 h-12 mx-auto mb-4 text-blue-500" />
+          <h3 className="text-xl font-bold mb-2">Global Reach</h3>
+          <p className="text-gray-400 text-sm">Worldwide advertisers</p>
+        </div>
+        
+        <div className="p-6 rounded-2xl bg-gray-800/40 backdrop-blur-md border border-gray-700 text-center hover:scale-105 transition-transform">
+          <Shield className="w-12 h-12 mx-auto mb-4 text-purple-500" />
+          <h3 className="text-xl font-bold mb-2">Full Control</h3>
+          <p className="text-gray-400 text-sm">Your space, your rules</p>
+        </div>
+      </div>
+      
+      <div className="p-8 rounded-3xl bg-gray-800/40 backdrop-blur-md border border-gray-700">
+        <div className="max-w-2xl mx-auto space-y-6">
+          <div>
+            <label className="block text-sm font-medium mb-3">Ad Space Title</label>
+            <input 
+              type="text" 
+              placeholder="Times Square Billboard #42"
+              className="w-full p-4 rounded-2xl border bg-gray-900/50 border-gray-700 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+              value={listingData.title}
+              onChange={(e) => setListingData({...listingData, title: e.target.value})}
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium mb-3">Space Type</label>
+            <select 
+              className="w-full p-4 rounded-2xl border bg-gray-900/50 border-gray-700 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+              value={listingData.spaceType}
+              onChange={(e) => setListingData({...listingData, spaceType: e.target.value})}
+            >
+              <option value="">Select a type</option>
+              <option value="billboard">Digital Billboard</option>
+              <option value="website">Website Banner</option>
+              <option value="mobile">Mobile App Space</option>
+              <option value="social">Social Media</option>
+              <option value="physical">Physical Screen</option>
+              <option value="virtual">Virtual/Gaming Space</option>
+            </select>
+          </div>
+          
+          <div className="grid md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium mb-3">Display Size</label>
+              <input 
+                type="text" 
+                placeholder="1920x1080"
+                className="w-full p-4 rounded-2xl border bg-gray-900/50 border-gray-700 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+                value={listingData.displaySize}
+                onChange={(e) => setListingData({...listingData, displaySize: e.target.value})}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-3">Price (SOL/day)</label>
+              <input 
+                type="number" 
+                step="0.01"
+                placeholder="0.25"
+                className="w-full p-4 rounded-2xl border bg-gray-900/50 border-gray-700 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+                value={listingData.pricePerDay}
+                onChange={(e) => setListingData({...listingData, pricePerDay: e.target.value})}
+              />
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium mb-3">Location</label>
+            <input 
+              type="text" 
+              placeholder="New York, Times Square"
+              className="w-full p-4 rounded-2xl border bg-gray-900/50 border-gray-700 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+              value={listingData.location}
+              onChange={(e) => setListingData({...listingData, location: e.target.value})}
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium mb-3">Traffic Description</label>
+            <textarea 
+              placeholder="Describe your audience: foot traffic patterns, demographics, peak times, typical engagement levels..."
+              className="w-full p-4 rounded-2xl border bg-gray-900/50 border-gray-700 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 min-h-[100px] resize-y"
+              value={listingData.trafficDescription}
+              onChange={(e) => setListingData({...listingData, trafficDescription: e.target.value})}
+            />
+            <p className="text-xs text-gray-500 mt-2">
+              Provide estimates of your audience reach. All view counts are approximations to help advertisers understand your space's potential.
+            </p>
+          </div>
+          
+          {/* Availability Section */}
+          <div className="p-6 rounded-2xl bg-gray-900/50 border border-gray-700 space-y-4">
+            <h3 className="text-lg font-bold flex items-center">
+              <Calendar className="w-5 h-5 mr-2 text-green-500" />
+              Availability & Flexibility
+            </h3>
+            
+            <p className="text-sm text-gray-400">
+              You may already have pre-existing ad contracts. Input your flexibility to maximize your earning potential and fill gaps in your schedule.
+            </p>
+            
+            <div>
+              <label className="block text-sm font-medium mb-3">Scheduling Flexibility</label>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { value: 'high', label: 'High', desc: 'Very flexible, can work around most schedules' },
+                  { value: 'medium', label: 'Medium', desc: 'Some flexibility with advance notice' },
+                  { value: 'low', label: 'Low', desc: 'Limited availability, strict scheduling' }
+                ].map(({ value, label, desc }) => (
+                  <button
+                    key={value}
+                    onClick={() => setListingData({...listingData, availabilityFlexibility: value})}
+                    className={`p-4 rounded-lg border transition-all ${
+                      listingData.availabilityFlexibility === value
+                        ? 'bg-gradient-to-r from-green-500/20 to-blue-500/20 border-green-500/50'
+                        : 'bg-gray-800/50 border-gray-700 hover:bg-gray-800'
+                    }`}
+                  >
+                    <div className="font-semibold mb-1">{label}</div>
+                    <div className="text-xs text-gray-400">{desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <label className="flex items-center space-x-3 p-3 rounded-lg bg-gray-800/50 border border-gray-700 cursor-pointer hover:bg-gray-800/70">
+                <input
+                  type="checkbox"
+                  checked={listingData.availableWeekdays}
+                  onChange={(e) => setListingData({...listingData, availableWeekdays: e.target.checked})}
+                  className="w-5 h-5 rounded text-purple-500"
+                />
+                <span>Available Weekdays</span>
+              </label>
+              
+              <label className="flex items-center space-x-3 p-3 rounded-lg bg-gray-800/50 border border-gray-700 cursor-pointer hover:bg-gray-800/70">
+                <input
+                  type="checkbox"
+                  checked={listingData.availableWeekends}
+                  onChange={(e) => setListingData({...listingData, availableWeekends: e.target.checked})}
+                  className="w-5 h-5 rounded text-purple-500"
+                />
+                <span>Available Weekends</span>
+              </label>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-3">Blackout Dates (Optional)</label>
+              <input 
+                type="text" 
+                placeholder="e.g., Dec 24-26, Jan 1, Special events..."
+                className="w-full p-3 rounded-xl border bg-gray-800/50 border-gray-700 focus:border-purple-500 focus:outline-none"
+                value={listingData.blackoutDates}
+                onChange={(e) => setListingData({...listingData, blackoutDates: e.target.value})}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                List any dates when your ad space is unavailable
+              </p>
+            </div>
+          </div>
+          
+          <button 
+            onClick={handleSubmit}
+            disabled={isSubmitting || !connected}
+            className={`w-full py-4 rounded-2xl font-bold text-lg transition-all duration-500 ${
+              isSubmitting || !connected
+                ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                : 'bg-gradient-to-r from-purple-500 to-blue-600 text-white hover:shadow-xl hover:scale-105'
+            }`}
+          >
+            {isSubmitting ? (
+              <span className="flex items-center justify-center">
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                Creating Listing...
+              </span>
+            ) : !connected ? (
+              'Connect Wallet to List'
+            ) : (
+              'List Ad Space on Network'
+            )}
+          </button>
+        </div>
+      </div>
+    </main>
+  );
+};
+
+// ============ MAIN APP COMPONENT ============
+const ScreenSyncApp: React.FC = () => {
+  const [darkMode, setDarkMode] = useState(true);
+  const [currentPortal, setCurrentPortal] = useState<'marketplace' | 'owner'>('marketplace');
+  const [isVisionMode, setIsVisionMode] = useState(true); // Start with vision mode
+  const [listings, setListings] = useState<AdSpaceListing[]>([]);
+  const [selectedListing, setSelectedListing] = useState<AdSpaceListing | null>(null);
+  const [showContractBuilder, setShowContractBuilder] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Wallet context state
+  const [walletState, setWalletState] = useState({
+    connected: false,
+    publicKey: null as string | null,
+    connecting: false,
+    error: null as string | null
+  });
+  
+  const walletContext: WalletContextType = {
+    ...walletState,
+    connect: async () => {
+      setWalletState(prev => ({ ...prev, connecting: true, error: null }));
+      
+      setTimeout(() => {
+        setWalletState({
+          connected: true,
+          publicKey: 'Demo' + Math.random().toString(36).substring(7),
+          connecting: false,
+          error: null
+        });
+      }, 1500);
+    },
+    disconnect: () => {
+      setWalletState({
+        connected: false,
+        publicKey: null,
+        connecting: false,
+        error: null
+      });
+    },
+    signTransaction: async (tx) => tx
+  };
+  
+  useEffect(() => {
+    const loadListings = async () => {
+      setIsLoading(true);
+      try {
+        // Only load mock data in vision mode
+        if (isVisionMode) {
+          const data = await solanaService.fetchListings();
+          setListings(data);
+        } else {
+          // In live mode, would fetch from actual blockchain
+          setListings([]);
+        }
+      } catch (err) {
+        console.error('Failed to load listings:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadListings();
+  }, [isVisionMode]);
+  
+  const handleListingClick = (listing: AdSpaceListing) => {
+    if (listing.isAvailable) {
+      setSelectedListing(listing);
+      setShowContractBuilder(true);
+    }
+  };
+  
+  return (
+    <WalletContext.Provider value={walletContext}>
+      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 text-white">
+        {/* Header */}
+        <header className="sticky top-0 z-40 bg-gray-800/40 backdrop-blur-md border-b border-gray-700">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between h-16">
+              <div className="flex items-center space-x-6">
+                <h1 className="text-2xl font-black bg-gradient-to-r from-gray-300 to-red-600 bg-clip-text text-transparent">
+                  Screen Sync
+                </h1>
+                
+                {/* Portal Switcher */}
+                <div className="flex items-center bg-gray-900/50 rounded-xl p-1">
+                  <button
+                    onClick={() => setCurrentPortal('marketplace')}
+                    className={`px-4 py-2 rounded-lg transition-all flex items-center space-x-2 ${
+                      currentPortal === 'marketplace'
+                        ? 'bg-gradient-to-r from-red-500 to-purple-600 text-white'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <LayoutGrid className="w-4 h-4" />
+                    <span className="text-sm font-medium">Marketplace</span>
+                  </button>
+                  
+                  <button
+                    onClick={() => setCurrentPortal('owner')}
+                    className={`px-4 py-2 rounded-lg transition-all flex items-center space-x-2 ${
+                      currentPortal === 'owner'
+                        ? 'bg-gradient-to-r from-purple-500 to-blue-600 text-white'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <Store className="w-4 h-4" />
+                    <span className="text-sm font-medium">List Space</span>
+                  </button>
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-3">
+                <WalletButton />
+              </div>
+            </div>
+          </div>
+        </header>
+        
+        {/* Content */}
+        {currentPortal === 'marketplace' ? (
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            {/* Vision/Live Mode Toggle */}
+            <div className="mb-8">
+              <div className="flex items-center justify-center space-x-4 mb-4">
+                <button
+                  onClick={() => setIsVisionMode(false)}
+                  className={`px-6 py-3 rounded-xl font-semibold transition-all ${
+                    !isVisionMode
+                      ? 'bg-green-500/20 text-green-400 border-2 border-green-500'
+                      : 'bg-gray-800/40 text-gray-400 border border-gray-700 hover:bg-gray-800/60'
+                  }`}
+                >
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-2 h-2 rounded-full ${!isVisionMode ? 'bg-green-500 animate-pulse' : 'bg-gray-600'}`} />
+                    <span>Live Network</span>
+                  </div>
+                </button>
+                
+                <button
+                  onClick={() => setIsVisionMode(true)}
+                  className={`px-6 py-3 rounded-xl font-semibold transition-all ${
+                    isVisionMode
+                      ? 'bg-gradient-to-r from-red-500/20 to-purple-500/20 text-purple-400 border-2 border-purple-500'
+                      : 'bg-gray-800/40 text-gray-400 border border-gray-700 hover:bg-gray-800/60'
+                  }`}
+                >
+                  <div className="flex items-center space-x-2">
+                    <Activity className="w-4 h-4" />
+                    <span>Vision Mode</span>
+                  </div>
+                </button>
+              </div>
+              
+              {/* Mode Description */}
+              <div className={`p-6 rounded-2xl border ${
+                isVisionMode 
+                  ? 'bg-gradient-to-r from-red-500/10 via-purple-500/10 to-blue-500/10 border-purple-500/20'
+                  : 'bg-green-500/10 border-green-500/20'
+              }`}>
+                <div className="text-center">
+                  {isVisionMode ? (
+                    <>
+                      <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-red-400 to-purple-400 bg-clip-text text-transparent">
+                        Vision Mode - Preview Our Future
+                      </h2>
+                      <p className="text-gray-400">
+                        Exploring demo ad spaces. These are examples of what will be available when we launch on mainnet.
+                      </p>
+                      <p className="text-xs text-gray-500 mt-2">
+                        Note: All traffic metrics shown are approximations for demonstration purposes.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <h2 className="text-2xl font-bold mb-2 text-green-400">
+                        Live Network - Coming Soon
+                      </h2>
+                      <p className="text-gray-400">
+                        Real ad spaces will be available once we launch on Solana mainnet.
+                      </p>
+                      <p className="text-sm text-green-400/80 mt-3">
+                        Be among the first to list your space or book premium advertising spots!
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            {isLoading ? (
+              <div className="flex justify-center py-16">
+                <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+              </div>
+            ) : isVisionMode ? (
+              listings.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {listings.map((listing) => (
+                    <ListingCard
+                      key={listing.publicKey}
+                      listing={listing}
+                      onClick={() => handleListingClick(listing)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-16">
+                  <p className="text-gray-400">No listings available</p>
+                </div>
+              )
+            ) : (
+              <div className="text-center py-16">
+                <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-gray-800/50 mb-6">
+                  <Lock className="w-12 h-12 text-gray-600" />
+                </div>
+                <h3 className="text-2xl font-bold mb-4">No Live Listings Yet</h3>
+                <p className="text-gray-400 max-w-md mx-auto mb-6">
+                  We're preparing to launch on Solana mainnet. Switch to Vision Mode to preview 
+                  the types of ad spaces that will be available.
+                </p>
+                <button
+                  onClick={() => setIsVisionMode(true)}
+                  className="px-6 py-3 rounded-xl bg-gradient-to-r from-red-500 to-purple-600 text-white font-semibold hover:shadow-lg hover:scale-105 transition-all"
+                >
+                  Explore Vision Mode
+                </button>
+              </div>
+            )}
+            
+            {selectedListing && (
+              <ContractBuilder
+                listing={selectedListing}
+                isOpen={showContractBuilder}
+                onClose={() => {
+                  setShowContractBuilder(false);
+                  setSelectedListing(null);
+                }}
+              />
+            )}
+          </main>
+        ) : (
+          <AdSpaceOwnerPortal />
+        )}
+      </div>
+    </WalletContext.Provider>
+  );
+};
+
+export default ScreenSyncApp;
