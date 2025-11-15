@@ -940,7 +940,7 @@ const CampaignBuilder: React.FC<CampaignBuilderProps> = ({ adSpace, onClose }) =
                   }`}
                 >
                   <div className="font-semibold">{option.label}</div>
-                  <div className="text-xs text-gray-500">×{option.multiplier} efficiency</div>
+                  <div className="text-xs text-gray-500">Ã—{option.multiplier} efficiency</div>
                 </button>
               ))}
             </div>
@@ -976,7 +976,7 @@ const CampaignBuilder: React.FC<CampaignBuilderProps> = ({ adSpace, onClose }) =
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-400">
-                  Base Cost ({numberOfSlots} × {formatSol(adSpace.baseRatePerSlot)} SOL)
+                  Base Cost ({numberOfSlots} Ã— {formatSol(adSpace.baseRatePerSlot)} SOL)
                 </span>
                 <span className="text-white">
                   {formatSol(adSpace.baseRatePerSlot * BigInt(numberOfSlots))} SOL
