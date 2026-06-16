@@ -32,12 +32,20 @@ This repository contains the **frontend dApp** (UI). It currently runs on **mock
 
 ## Architecture
 
-Screen Sync uses a **hybrid Solana + IPFS** model:
+Screen Sync runs a **hybrid Solana + IPFS** model today, deliberately designed as a stepping stone toward a **fully on-chain protocol**.
 
-- **Listing metadata & bookings** → stored on-chain (Solana program)
-- **Ad creatives & media** → uploaded to IPFS via Pinata; the resulting CID is stored in the on-chain account
+**Today (hybrid):**
+- **Listings, bookings & settlement** → on-chain (Solana program)
+- **Ad creatives & media** → IPFS via Pinata; the resulting content ID (CID) is recorded in the on-chain account, so the media is content-addressed and tamper-evident even while pinning is delegated
 
-All chain/IPFS calls are currently stubbed in [`lib/solana.ts`](lib/solana.ts) and [`lib/pinata.ts`](lib/pinata.ts) for easy wiring later.
+**The intent — gradually go fully on-chain.** The hybrid split exists because large media and rich state are impractical/expensive to put directly on-chain right now. As tooling and costs improve, we migrate responsibilities on-chain in phases:
+
+1. **Phase 1 (current):** on-chain listings + settlement, media on IPFS/Pinata (CID anchored on-chain).
+2. **Phase 2:** decentralize pinning (multiple pinning providers / Arweave permanence) and move more booking/escrow logic into the program.
+3. **Phase 3:** on-chain proof-of-display and dispute resolution against immutable records.
+4. **Phase 4:** fully on-chain protocol — minimize off-chain trust to indexing/RPC only.
+
+All chain/IPFS calls are currently stubbed in [`lib/solana.ts`](lib/solana.ts) and [`lib/pinata.ts`](lib/pinata.ts) so the UI works on mock data and the real integrations drop in without UI changes.
 
 ---
 
