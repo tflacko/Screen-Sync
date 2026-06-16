@@ -1,0 +1,142 @@
+.hero {
+  position: relative;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--charcoal);
+}
+
+/* Cherry radial glow — top right, same as website. Also the mobile fallback
+   for the (disabled) particle canvas, so the hero still has depth on phones. */
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -80px;
+  right: -120px;
+  width: min(680px, 90vw);
+  height: min(680px, 90vw);
+  background: radial-gradient(circle, rgba(142, 31, 51, 0.22) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 1;
+}
+.hero::after {
+  content: '';
+  position: absolute;
+  bottom: -140px;
+  left: -120px;
+  width: min(560px, 80vw);
+  height: min(560px, 80vw);
+  background: radial-gradient(circle, rgba(94, 19, 34, 0.28) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 1.6rem;
+  padding: 0 1.5rem;
+  max-width: 760px;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--cherry-bright);
+}
+.eyebrow::before, .eyebrow::after {
+  content: '';
+  flex: 1 0 24px;
+  height: 1px;
+  background: rgba(194, 58, 82, 0.35);
+}
+
+.h1 {
+  font-size: clamp(3rem, 9vw, 6.4rem);
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  color: var(--beige);
+}
+.h1 span {
+  display: block;
+  -webkit-text-stroke: 1.5px var(--beige);
+  color: transparent;
+}
+
+.sub {
+  font-size: clamp(1rem, 2vw, 1.15rem);
+  color: var(--beige-dim);
+  max-width: 480px;
+  line-height: 1.65;
+}
+
+.ctas {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 0.4rem;
+}
+
+/* Ticker */
+.ticker {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  border-top: 1px solid rgba(234, 227, 211, 0.1);
+  overflow: hidden;
+  padding: 0.7rem 0;
+}
+.tickerTrack {
+  display: flex;
+  gap: 3rem;
+  animation: ticker 28s linear infinite;
+  white-space: nowrap;
+  will-change: transform;
+}
+@keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.tickerItem {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--beige-dim);
+  flex-shrink: 0;
+}
+.tickerSep { color: var(--cherry-bright); }
+
+.solanaChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(234, 227, 211, 0.1);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--beige-dim);
+  margin-top: -0.4rem;
+}
+.solanaDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--solana-grad);
+}

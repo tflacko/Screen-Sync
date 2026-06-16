@@ -1,0 +1,187 @@
+.btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.4rem;
+  border-radius: var(--radius-btn);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.88rem;
+  letter-spacing: 0.02em;
+  background: var(--cherry);
+  color: var(--beige);
+  border: none;
+  cursor: pointer;
+  transition: background 0.25s, box-shadow 0.25s, transform 0.2s var(--ease);
+  white-space: nowrap;
+}
+.btn:hover {
+  background: var(--cherry-bright);
+  box-shadow: 0 6px 24px rgba(194, 58, 82, 0.35);
+  transform: translateY(-1px);
+}
+
+.connected {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 1.2rem;
+  border-radius: var(--radius-btn);
+  border: 1.5px solid rgba(234, 227, 211, 0.18);
+  background: var(--charcoal-2);
+  cursor: pointer;
+  position: relative;
+  transition: border-color 0.25s, background 0.25s;
+}
+.connected:hover { border-color: var(--cherry-bright); background: var(--charcoal-3); }
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #14f195;
+  flex-shrink: 0;
+  box-shadow: 0 0 6px #14f195;
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.address {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--beige);
+  letter-spacing: 0.05em;
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  background: var(--charcoal-2);
+  border: 1px solid rgba(234, 227, 211, 0.12);
+  border-radius: 12px;
+  overflow: hidden;
+  min-width: 160px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  z-index: 200;
+}
+.dropItem {
+  display: block;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-size: 0.88rem;
+  color: var(--beige-dim);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.dropItem:hover { background: var(--charcoal-3); color: var(--beige); }
+.dropItem.danger:hover { color: var(--cherry-bright); }
+
+/* Wallet selector modal */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 12, 10, 0.75);
+  backdrop-filter: blur(6px);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s var(--ease);
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.modal {
+  background: var(--charcoal-2);
+  border: 1px solid rgba(234, 227, 211, 0.1);
+  border-radius: 20px;
+  padding: 2rem;
+  width: min(420px, 92vw);
+  animation: slideUp 0.3s var(--ease);
+}
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+.modalTitle {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--beige);
+}
+.closeBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--charcoal-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--beige-dim);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.closeBtn:hover { background: var(--cherry-deep); color: var(--beige); }
+
+.walletList { display: flex; flex-direction: column; gap: 0.6rem; }
+
+.walletOption {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.9rem 1.1rem;
+  border-radius: 12px;
+  background: var(--charcoal-3);
+  border: 1px solid rgba(234, 227, 211, 0.07);
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: border-color 0.2s, background 0.2s;
+}
+.walletOption:hover { border-color: var(--cherry); background: rgba(142, 31, 51, 0.08); }
+
+.walletIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--charcoal-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.walletIcon img { width: 100%; height: 100%; object-fit: contain; }
+
+.walletName {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--beige);
+}
+.walletStatus {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--beige-dim);
+  margin-top: 0.15rem;
+}
+
+.noWallets {
+  text-align: center;
+  padding: 1rem;
+  color: var(--beige-dim);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+.noWallets a { color: var(--cherry-bright); }

@@ -1,0 +1,32 @@
+.page {
+  padding-top: 5rem; /* nav height offset */
+  min-height: 100svh;
+}
+
+.header {
+  width: var(--container);
+  margin: 0 auto;
+  padding: 2.25rem 0 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.title {
+  font-size: clamp(2rem, 4.5vw, 3.2rem);
+  font-weight: 700;
+}
+
+.meta {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  color: var(--beige-dim);
+  text-transform: uppercase;
+}
+
+.body {
+  width: var(--container);
+  margin: 0 auto;
+  padding-bottom: var(--section-pad);
+}

@@ -1,0 +1,32 @@
+.card {
+  background: var(--charcoal-2);
+  border: 1px solid rgba(234, 227, 211, 0.08);
+  border-radius: var(--radius-card);
+  padding: 1.6rem;
+  position: relative;
+  transform: perspective(800px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transition: border-color 0.3s, box-shadow 0.3s, transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  overflow: hidden;
+  will-change: transform;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    260px circle at var(--mx, 50%) var(--my, 50%),
+    rgba(142, 31, 51, 0.13),
+    transparent 70%
+  );
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+  z-index: 0;
+}
+
+.card:hover {
+  border-color: var(--cherry);
+  box-shadow: 0 24px 56px rgba(20, 15, 10, 0.5);
+}
+.card:hover::before { opacity: 1; }

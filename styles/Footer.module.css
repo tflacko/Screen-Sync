@@ -1,0 +1,65 @@
+.footer {
+  background: #161412;
+  border-top: 1px solid rgba(234, 227, 211, 0.07);
+  padding: 3rem 0 2rem;
+}
+
+.inner {
+  width: var(--container);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  text-align: center;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.logoWordmark {
+  height: 20px;
+  width: auto;
+  display: block;
+  opacity: 0.85;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.6rem;
+  justify-content: center;
+  list-style: none;
+}
+.link {
+  font-size: 0.85rem;
+  color: var(--beige-dim);
+  transition: color 0.2s;
+}
+.link:hover { color: var(--beige); }
+
+.legal {
+  font-size: 0.78rem;
+  color: rgba(181, 171, 148, 0.5);
+  font-family: var(--font-mono);
+}
+
+.solana {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--beige-dim);
+  opacity: 0.5;
+}
+.solanaDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--solana-grad);
+}

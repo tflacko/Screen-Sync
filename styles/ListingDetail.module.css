@@ -1,0 +1,271 @@
+.page {
+  padding-top: 5rem;
+  min-height: 100svh;
+}
+
+.back {
+  width: var(--container);
+  margin: 0 auto;
+  padding: 2rem 0 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--beige-dim);
+  text-decoration: none;
+  transition: color 0.2s;
+  width: fit-content;
+}
+.back:hover { color: var(--cherry-bright); }
+
+.layout {
+  width: var(--container);
+  margin: 0 auto;
+  padding: 2.5rem 0 var(--section-pad);
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 2.5rem;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+}
+
+/* Left: media + info */
+.media {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 16px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2rem;
+  overflow: hidden;
+}
+.mediaImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.media[data-type='video-game'] { background: linear-gradient(135deg, #120824 0%, #2d1b69 55%, #0a0420 100%); }
+.media[data-type='billboard']  { background: linear-gradient(135deg, #180800 0%, #6b2d0a 55%, #3a0a00 100%); }
+.media[data-type='streamer']   { background: linear-gradient(135deg, #050f2e 0%, #0f2460 55%, #020b1e 100%); }
+.media[data-type='website']    { background: linear-gradient(135deg, #021510 0%, #064830 55%, #010e09 100%); }
+.media[data-type='aerial']         { background: linear-gradient(135deg, #020d18 0%, #0a3050 55%, #010a12 100%); }
+.media[data-type='business-front'] { background: linear-gradient(135deg, #1a0f00 0%, #6b3a00 55%, #120a00 100%); }
+
+.infoSection { margin-bottom: 2rem; }
+
+.title {
+  font-size: clamp(1.6rem, 3.5vw, 2.4rem);
+  font-weight: 700;
+  margin: 0.8rem 0 0.5rem;
+}
+
+.location {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--beige-dim);
+  letter-spacing: 0.08em;
+  margin-bottom: 1.4rem;
+}
+
+.description {
+  color: var(--beige-2);
+  line-height: 1.7;
+  font-size: 0.97rem;
+  margin-bottom: 1.6rem;
+}
+
+.badgeRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.publisherBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: 1px solid currentColor;
+}
+.publisherBadge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.publisherBadge.commercial { color: #d9a23a; background: rgba(217, 162, 58, 0.1); }
+.publisherBadge.private    { color: #8aa0ff; background: rgba(138, 160, 255, 0.1); }
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.tag {
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(234, 227, 211, 0.15);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  color: var(--beige-dim);
+}
+
+.specGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem;
+  margin-top: 1.5rem;
+}
+.spec {
+  background: var(--charcoal-2);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(234, 227, 211, 0.07);
+}
+.specKey {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--beige-dim);
+  margin-bottom: 0.25rem;
+}
+.specVal {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--beige);
+}
+
+/* Right: booking panel */
+.panel {
+  position: sticky;
+  top: 5.5rem;
+}
+
+.panelInner {
+  background: var(--charcoal-2);
+  border: 1px solid rgba(234, 227, 211, 0.1);
+  border-radius: 18px;
+  padding: 1.8rem;
+}
+
+.panelPrice {
+  margin-bottom: 1.4rem;
+  padding-bottom: 1.2rem;
+  border-bottom: 1px solid rgba(234, 227, 211, 0.1);
+}
+.panelPriceNum {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 2rem;
+  color: var(--beige);
+}
+.panelPriceSol {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--cherry-bright);
+  margin-left: 0.25rem;
+}
+.panelPriceLabel {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--beige-dim);
+  margin-top: 0.2rem;
+}
+
+.daysRow {
+  margin-bottom: 1.2rem;
+}
+.daysLabel {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--beige-dim);
+  margin-bottom: 0.5rem;
+  display: block;
+}
+.daysInput {
+  width: 100%;
+  padding: 0.7rem 1rem;
+  border-radius: 10px;
+  border: 1.5px solid rgba(234, 227, 211, 0.14);
+  background: var(--charcoal-3);
+  color: var(--beige);
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.daysInput:focus { border-color: var(--cherry); }
+
+.totalRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.2rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--beige-dim);
+}
+.totalVal {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--cherry-bright);
+}
+
+.btnGap { margin-top: 0.6rem; }
+
+.ownerRow {
+  margin-top: 1.4rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid rgba(234, 227, 211, 0.1);
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--beige-dim);
+  letter-spacing: 0.06em;
+}
+.ownerAddr { color: var(--beige); }
+
+.cidRow {
+  margin-top: 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: rgba(181, 171, 148, 0.45);
+  word-break: break-all;
+}
+
+.notFound {
+  width: var(--container);
+  margin: 8rem auto;
+  text-align: center;
+  color: var(--beige-dim);
+}
