@@ -189,6 +189,16 @@
   font-size: 0.78rem;
   color: #14f195;
 }
+.uploadError {
+  padding: 0.7rem 1rem;
+  background: rgba(194, 58, 82, 0.1);
+  border: 1px solid rgba(194, 58, 82, 0.35);
+  border-radius: 8px;
+  margin-top: 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--cherry-bright);
+}
 
 .actions {
   display: flex;

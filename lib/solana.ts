@@ -1,7 +1,10 @@
 import type { Listing } from './mockData';
 import { LISTINGS } from './mockData';
+import { bookingTotal } from './pricing';
 
-export const SOLANA_RPC = 'https://api.devnet.solana.com';
+// Phase 1 (hybrid): Devnet RPC. Override via env for mainnet/custom RPC later.
+export const SOLANA_RPC =
+  process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.devnet.solana.com';
 
 /** Stub: simulate creating a listing on-chain */
 export async function createListing(data: Partial<Listing>): Promise<string> {
@@ -10,9 +13,10 @@ export async function createListing(data: Partial<Listing>): Promise<string> {
   return `mock_tx_${Date.now()}`;
 }
 
-/** Stub: simulate booking a listing */
-export async function bookListing(listingId: string, days: number): Promise<string> {
-  console.log(`[Screen Sync] bookListing stub → ${listingId} for ${days} days`);
+/** Stub: simulate booking a listing. Real version transfers `total` (incl. protocol fee). */
+export async function bookListing(listingId: string, pricePerDay: number, days: number): Promise<string> {
+  const { base, fee, total } = bookingTotal(pricePerDay, days);
+  console.log(`[Screen Sync] bookListing stub → ${listingId} · ${days}d · base ${base} + fee ${fee} = ${total} SOL`);
   await new Promise((r) => setTimeout(r, 1000));
   return `mock_tx_${Date.now()}`;
 }

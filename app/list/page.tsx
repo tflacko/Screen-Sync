@@ -23,6 +23,7 @@ export default function CreateListingPage() {
   const [file, setFile] = useState<File | null>(null);
   const [cid, setCid] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [txHash, setTxHash] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
@@ -47,9 +48,16 @@ export default function CreateListingPage() {
 
   async function handleUpload(f: File) {
     setUploading(true);
-    const result = await uploadToIPFS(f);
-    setCid(result);
-    setUploading(false);
+    setUploadError('');
+    try {
+      const result = await uploadToIPFS(f);
+      setCid(result);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed');
+      setFile(null);
+    } finally {
+      setUploading(false);
+    }
   }
 
   async function handleSubmit() {
@@ -151,9 +159,9 @@ export default function CreateListingPage() {
             >
               <div className={styles.uploadIcon}>📁</div>
               <div className={styles.uploadText}>{uploading ? 'Uploading to IPFS…' : 'Click to upload'}</div>
-              <div className={styles.uploadSub}>Images, video, or PDF · Max 50MB · Stored on IPFS via Pinata</div>
+              <div className={styles.uploadSub}>Images or video · Max 5MB · Stored on IPFS via Pinata</div>
             </div>
-            <input ref={fileRef} type="file" accept="image/*,video/*,.pdf" hidden
+            <input ref={fileRef} type="file" accept="image/*,video/*" hidden
               onChange={async (e) => {
                 const f = e.target.files?.[0];
                 if (f) { setFile(f); await handleUpload(f); }
@@ -162,6 +170,9 @@ export default function CreateListingPage() {
               <div className={styles.uploadedFile}>
                 ✓ {file.name} · CID: {cid.slice(0, 20)}…
               </div>
+            )}
+            {uploadError && (
+              <div className={styles.uploadError}>⚠ {uploadError}</div>
             )}
             <div className={styles.actions} style={{ marginTop: '1.5rem' }}>
               <Button variant="ghost" onClick={() => setStep(1)}>← Back</Button>

@@ -4,6 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { LISTINGS, PUBLISHER_LABELS, listingImage } from '@/lib/mockData';
+import { bookingTotal } from '@/lib/pricing';
+import { PLATFORM_FEE_BPS } from '@/lib/constants';
 import TypeBadge from '@/components/TypeBadge';
 import Button from '@/components/Button';
 import KickerLabel from '@/components/KickerLabel';
@@ -32,7 +34,8 @@ export default function ListingDetailPage() {
     );
   }
 
-  const total = (listing.pricePerDay * days).toFixed(3);
+  const { base, fee, total } = bookingTotal(listing.pricePerDay, days);
+  const feePct = (PLATFORM_FEE_BPS / 100).toFixed(1);
 
   function handleBook() {
     setBooked(true);
@@ -123,9 +126,17 @@ export default function ListingDetailPage() {
               />
             </div>
 
+            <div className={styles.feeRow}>
+              <span>Subtotal ({days} {days === 1 ? 'day' : 'days'})</span>
+              <span>{base.toFixed(3)} SOL</span>
+            </div>
+            <div className={styles.feeRow}>
+              <span>Protocol fee ({feePct}%)</span>
+              <span>{fee.toFixed(3)} SOL</span>
+            </div>
             <div className={styles.totalRow}>
               <span>Estimated Total</span>
-              <span className={styles.totalVal}>{total} SOL</span>
+              <span className={styles.totalVal}>{total.toFixed(3)} SOL</span>
             </div>
 
             <Button

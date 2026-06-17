@@ -1,5 +1,13 @@
-/** Stub: upload a file to IPFS via Pinata and return its CID */
+import { validateFileContent } from './fileValidation';
+
+// Public IPFS gateway for reads; pinning keys live server-side (never expose secrets client-side).
+export const IPFS_GATEWAY =
+  process.env.NEXT_PUBLIC_IPFS_GATEWAY || 'https://gateway.pinata.cloud/ipfs';
+
+/** Stub: validate + upload a file to IPFS via Pinata and return its CID */
 export async function uploadToIPFS(file: File): Promise<string> {
+  const check = await validateFileContent(file);
+  if (!check.valid) throw new Error(check.error ?? 'Invalid file');
   console.log('[Screen Sync] uploadToIPFS stub → filename:', file.name);
   await new Promise((r) => setTimeout(r, 1500));
   const mockCid = `QmMock${Math.random().toString(36).slice(2, 12).toUpperCase()}`;
