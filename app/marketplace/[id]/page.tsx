@@ -27,8 +27,8 @@ export default function ListingDetailPage() {
     return (
       <div className={styles.notFound}>
         <p>Listing not found.</p>
-        <Link href="/marketplace" style={{ color: 'var(--cherry-bright)', marginTop: '1rem', display: 'inline-block' }}>
-          ← Back to Marketplace
+        <Link href="/" style={{ color: 'var(--cherry-bright)', marginTop: '1rem', display: 'inline-block' }}>
+          ← Back to Listings
         </Link>
       </div>
     );
@@ -45,7 +45,7 @@ export default function ListingDetailPage() {
   return (
     <div className={styles.page}>
       <div style={{ width: 'var(--container)', margin: '0 auto' }}>
-        <Link href="/marketplace" className={styles.back}>← Back to Marketplace</Link>
+        <Link href="/" className={styles.back}>← Back to Listings</Link>
       </div>
 
       <div className={styles.layout}>

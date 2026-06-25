@@ -2,10 +2,9 @@ import Link from 'next/link';
 import styles from '@/styles/Footer.module.css';
 
 const LINKS = [
-  { href: '/marketplace', label: 'Marketplace' },
+  { href: '/', label: 'Marketplace' },
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/list', label: 'List Inventory' },
-  { href: '/', label: 'Home' },
 ];
 
 export default function Footer() {

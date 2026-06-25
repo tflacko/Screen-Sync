@@ -7,13 +7,14 @@ import WalletButton from './WalletButton';
 import styles from '@/styles/Navbar.module.css';
 
 const NAV_LINKS = [
-  { href: '/marketplace', label: 'Marketplace' },
+  { href: '/', label: 'Marketplace' },
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/list', label: 'List Inventory' },
 ];
 
 export default function Navbar() {
   const pathname = usePathname();
+  const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -39,7 +40,7 @@ export default function Navbar() {
             <li key={href}>
               <Link
                 href={href}
-                className={`${styles.link} ${pathname.startsWith(href) ? styles.active : ''}`}
+                className={`${styles.link} ${isActive(href) ? styles.active : ''}`}
               >
                 {label}
               </Link>
@@ -68,7 +69,7 @@ export default function Navbar() {
             <Link
               key={href}
               href={href}
-              className={`${styles.mobileLink} ${pathname.startsWith(href) ? styles.active : ''}`}
+              className={`${styles.mobileLink} ${isActive(href) ? styles.active : ''}`}
             >
               {label}
             </Link>

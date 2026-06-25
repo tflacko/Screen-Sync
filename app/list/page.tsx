@@ -216,7 +216,7 @@ export default function CreateListingPage() {
             <p className={styles.successSub}>
               Your listing has been submitted to the Solana devnet (mock). It will appear in the marketplace once confirmed on-chain.
             </p>
-            <Button href="/marketplace" variant="cherry">Browse Marketplace</Button>
+            <Button href="/" variant="cherry">Browse Marketplace</Button>
             <div className={styles.mockTx}>Mock TX: {txHash}</div>
           </div>
         )}

@@ -30,7 +30,7 @@ export default function DashboardPage() {
             Connect a Solana wallet to access your dashboard, view listings, and manage campaigns.
           </p>
           <WalletButton />
-          <Button href="/marketplace" variant="ghost" size="sm">Browse Marketplace</Button>
+          <Button href="/" variant="ghost" size="sm">Browse Marketplace</Button>
         </div>
       </div>
     );
