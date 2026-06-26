@@ -45,3 +45,25 @@ export const FILE_SIGNATURES: Record<string, number[]> = {
   'video/mp4': [0x00, 0x00, 0x00],
   'video/webm': [0x1a, 0x45, 0xdf, 0xa3],
 };
+
+// ---- Contract Builder ----
+
+/** A day is split into time blocks advertisers can reserve exclusively (3-hour blocks). */
+export const BLOCKS_PER_DAY = 8;
+
+/** An exclusive premium slot costs more than the per-day average rate. */
+export const SLOT_PREMIUM = 1.5;
+
+export interface FillerTier {
+  id: 'low' | 'medium' | 'high';
+  label: string;
+  factor: number; // fraction of pricePerDay charged per day
+  cadence: string; // human-readable rotation frequency
+}
+
+/** Filler runs your ad in the gaps between premium slot ads, at a chosen frequency. */
+export const FILLER_TIERS: FillerTier[] = [
+  { id: 'low', label: 'Low', factor: 0.25, cadence: '~1 in 6 rotations' },
+  { id: 'medium', label: 'Medium', factor: 0.5, cadence: '~1 in 3 rotations' },
+  { id: 'high', label: 'High', factor: 1.0, cadence: '~every other rotation' },
+];

@@ -1,14 +1,11 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { LISTINGS, PUBLISHER_LABELS, listingImage } from '@/lib/mockData';
-import { bookingTotal } from '@/lib/pricing';
-import { PLATFORM_FEE_BPS } from '@/lib/constants';
 import TypeBadge from '@/components/TypeBadge';
-import Button from '@/components/Button';
 import KickerLabel from '@/components/KickerLabel';
+import ContractBuilder from '@/components/contract/ContractBuilder';
 import styles from '@/styles/ListingDetail.module.css';
 
 function fmtImpr(n: number): string {
@@ -20,8 +17,6 @@ function fmtImpr(n: number): string {
 export default function ListingDetailPage() {
   const { id } = useParams<{ id: string }>();
   const listing = LISTINGS.find((l) => l.id === id);
-  const [days, setDays] = useState(7);
-  const [booked, setBooked] = useState(false);
 
   if (!listing) {
     return (
@@ -32,14 +27,6 @@ export default function ListingDetailPage() {
         </Link>
       </div>
     );
-  }
-
-  const { base, fee, total } = bookingTotal(listing.pricePerDay, days);
-  const feePct = (PLATFORM_FEE_BPS / 100).toFixed(1);
-
-  function handleBook() {
-    setBooked(true);
-    setTimeout(() => setBooked(false), 3000);
   }
 
   return (
@@ -102,59 +89,10 @@ export default function ListingDetailPage() {
           </div>
         </div>
 
-        {/* Right column — booking panel */}
+        {/* Right column — Contract Builder */}
         <div className={styles.panel}>
           <div className={styles.panelInner}>
-            <div className={styles.panelPrice}>
-              <div>
-                <span className={styles.panelPriceNum}>{listing.pricePerDay.toFixed(2)}</span>
-                <span className={styles.panelPriceSol}>SOL</span>
-              </div>
-              <div className={styles.panelPriceLabel}>per day · {fmtImpr(listing.impressionsPerDay)} impressions</div>
-            </div>
-
-            <div className={styles.daysRow}>
-              <label className={styles.daysLabel} htmlFor="days">Duration (days)</label>
-              <input
-                id="days"
-                type="number"
-                min={1}
-                max={365}
-                value={days}
-                onChange={(e) => setDays(Math.max(1, Number(e.target.value)))}
-                className={styles.daysInput}
-              />
-            </div>
-
-            <div className={styles.feeRow}>
-              <span>Subtotal ({days} {days === 1 ? 'day' : 'days'})</span>
-              <span>{base.toFixed(3)} SOL</span>
-            </div>
-            <div className={styles.feeRow}>
-              <span>Protocol fee ({feePct}%)</span>
-              <span>{fee.toFixed(3)} SOL</span>
-            </div>
-            <div className={styles.totalRow}>
-              <span>Estimated Total</span>
-              <span className={styles.totalVal}>{total.toFixed(3)} SOL</span>
-            </div>
-
-            <Button
-              variant="cherry"
-              full
-              onClick={handleBook}
-              disabled={booked}
-            >
-              {booked ? '✓ Request Sent (Mock)' : 'Book Now'}
-            </Button>
-            <div className={styles.btnGap}>
-              <Button variant="ghost" full>Make Offer</Button>
-            </div>
-
-            <div className={styles.ownerRow}>
-              <span>Owner</span>
-              <span className={styles.ownerAddr}>{listing.owner}</span>
-            </div>
+            <ContractBuilder listing={listing} />
             <div className={styles.cidRow}>IPFS CID: {listing.ipfsCid}</div>
           </div>
         </div>
