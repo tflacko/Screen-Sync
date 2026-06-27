@@ -171,10 +171,10 @@ Round all UI numbers; on-chain is integer lamports — convert with `lib/format.
 
 ## 10. Open decisions (resolve with the team)
 1. ~~**Payment currency**~~ — **DECIDED: SOL + USDC-ready.** Ship SOL escrow first; keep all escrow/settle paths mint-agnostic via `Config.accepted_mint` so USDC turns on without a refactor. (See §5.)
-2. **Listing as Core NFT vs pure PDA** — Recommend Core NFT (ownership/transfer/secondary) **+** PDA for state. Confirm publishers should be able to *sell/transfer* listings.
+2. ~~**Listing as Core NFT vs pure PDA**~~ — **DECIDED: Core NFT + state PDA.** Listings are transferable Core NFTs (publishers can sell/transfer an ad space; secondary market enabled); the mutable booking/availability ledger lives in the Anchor PDA. (See §3, §4.)
 3. **Booking granularity** — day + 3-hour blocks (current UI). Confirm before locking the bitmap layout.
 4. **Rotation/filler enforcement** — how strictly to cap filler share on-chain vs trust the serving layer.
-5. **Oracle trust** — centralized Screen Sync oracle first, then decentralize. Confirm acceptable for launch.
+5. ~~**Oracle trust**~~ — **DECIDED: centralized Screen Sync oracle for now**, decentralize later. The oracle key is stored in `Config.oracle` and signs `record_delivery` / `settle_booking`; design these ix so the signer can later become a multi-attestor set without changing the booking flow. (See §7.)
 6. **Contract NFT** — mint a Core receipt per booking (recommended) or keep bookings PDA-only to save cost?
 
 ---
