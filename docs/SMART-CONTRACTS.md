@@ -96,9 +96,9 @@ Mirror the dApp math exactly: see `lib/pricing.ts` (`slotPrice`, `slotBookingCos
 
 ---
 
-## 5. Payment model
+## 5. Payment model — DECIDED: SOL + USDC-ready
 - **v1: SOL** (matches the dApp's SOL pricing today — least friction on devnet).
-- **Recommended for mainnet: USDC (SPL)** for price stability; program takes `accepted_mint` in Config so it's swappable. Implement SOL first, add USDC via token accounts.
+- **USDC-ready from day one:** Config carries `accepted_mint` (native-SOL sentinel **or** an SPL mint). Build SOL escrow first, but design every escrow/settle path mint-agnostic so enabling **USDC (SPL)** is a config flip + token-account plumbing, not a refactor. Escrow holds either lamports (SOL) or an SPL token account (USDC) keyed off `accepted_mint`. UI shows the active currency; `lib/pricing.ts` math is currency-agnostic (units only).
 
 ---
 
@@ -170,7 +170,7 @@ Round all UI numbers; on-chain is integer lamports — convert with `lib/format.
 ---
 
 ## 10. Open decisions (resolve with the team)
-1. **Payment currency** — SOL for v1, USDC for mainnet? (Recommend: SOL now, USDC-ready Config.)
+1. ~~**Payment currency**~~ — **DECIDED: SOL + USDC-ready.** Ship SOL escrow first; keep all escrow/settle paths mint-agnostic via `Config.accepted_mint` so USDC turns on without a refactor. (See §5.)
 2. **Listing as Core NFT vs pure PDA** — Recommend Core NFT (ownership/transfer/secondary) **+** PDA for state. Confirm publishers should be able to *sell/transfer* listings.
 3. **Booking granularity** — day + 3-hour blocks (current UI). Confirm before locking the bitmap layout.
 4. **Rotation/filler enforcement** — how strictly to cap filler share on-chain vs trust the serving layer.
