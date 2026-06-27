@@ -33,6 +33,9 @@
 
 @media (max-width: 900px) {
   .layout { grid-template-columns: 1fr; }
+  /* Builder drops below the listing and spans full width — no sticky on mobile */
+  .panel { position: static; }
+  .panelInner { padding: 1.4rem; }
 }
 
 /* Left: media + info */
@@ -170,102 +173,6 @@
   border-radius: 18px;
   padding: 1.8rem;
 }
-
-.panelPrice {
-  margin-bottom: 1.4rem;
-  padding-bottom: 1.2rem;
-  border-bottom: 1px solid rgba(234, 227, 211, 0.1);
-}
-.panelPriceNum {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 2rem;
-  color: var(--beige);
-}
-.panelPriceSol {
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-  color: var(--cherry-bright);
-  margin-left: 0.25rem;
-}
-.panelPriceLabel {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--beige-dim);
-  margin-top: 0.2rem;
-}
-
-.daysRow {
-  margin-bottom: 1.2rem;
-}
-.daysLabel {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--beige-dim);
-  margin-bottom: 0.5rem;
-  display: block;
-}
-.daysInput {
-  width: 100%;
-  padding: 0.7rem 1rem;
-  border-radius: 10px;
-  border: 1.5px solid rgba(234, 227, 211, 0.14);
-  background: var(--charcoal-3);
-  color: var(--beige);
-  font-family: var(--font-display);
-  font-size: 1rem;
-  font-weight: 600;
-  outline: none;
-  transition: border-color 0.2s;
-}
-.daysInput:focus { border-color: var(--cherry); }
-
-.feeRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-  font-family: var(--font-mono);
-  font-size: 0.74rem;
-  color: var(--beige-dim);
-}
-.totalRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 0.7rem;
-  margin-bottom: 1.2rem;
-  padding-top: 0.8rem;
-  border-top: 1px solid rgba(234, 227, 211, 0.12);
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  color: var(--beige-dim);
-}
-.totalVal {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 1rem;
-  color: var(--cherry-bright);
-}
-
-.btnGap { margin-top: 0.6rem; }
-
-.ownerRow {
-  margin-top: 1.4rem;
-  padding-top: 1.2rem;
-  border-top: 1px solid rgba(234, 227, 211, 0.1);
-  display: flex;
-  justify-content: space-between;
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  color: var(--beige-dim);
-  letter-spacing: 0.06em;
-}
-.ownerAddr { color: var(--beige); }
 
 .cidRow {
   margin-top: 0.6rem;
