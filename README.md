@@ -13,7 +13,7 @@ Screen Sync turns ad inventory into a tradeable, on-chain marketplace. Advertise
 This repository contains the **frontend dApp** (UI). It currently runs on **mock data** with stubbed on-chain and IPFS calls, architected so the live Solana program and Pinata integration can be wired in without UI changes.
 
 ### Inventory types
-🎮 Video Game · 📺 Billboard · 📡 Streamer · 🌐 Website · 🎰 Casino · 🛸 Blimp · 🏪 Storefront
+🎮 Video Game · 📺 Billboard · 📡 Stream/TV · 🌐 Website ·  🛸 Mobile · 🏪 Storefront
 
 ---
 
