@@ -1,10 +1,10 @@
 export type ListingType =
   | 'video-game'
   | 'billboard'
-  | 'streamer'
+  | 'stream-tv'
   | 'website'
-  | 'aerial'
-  | 'business-front';
+  | 'mobile'
+  | 'storefront';
 
 export type PublisherType = 'commercial' | 'private';
 
@@ -59,7 +59,7 @@ export const LISTINGS: Listing[] = [
   },
   {
     id: 'lst_003',
-    type: 'streamer',
+    type: 'stream-tv',
     title: 'Twitch Stream Overlay — 50K+ Viewers',
     location: 'Twitch · @NightOwlGaming',
     pricePerDay: 1.6,
@@ -91,7 +91,7 @@ export const LISTINGS: Listing[] = [
   },
   {
     id: 'lst_005',
-    type: 'business-front',
+    type: 'storefront',
     title: 'Casino Machine Banners',
     location: 'Las Vegas, NV · MGM Grand Floor',
     pricePerDay: 2.4,
@@ -107,7 +107,7 @@ export const LISTINGS: Listing[] = [
   },
   {
     id: 'lst_006',
-    type: 'aerial',
+    type: 'mobile',
     title: 'Aerial Blimp Ad — Miami Beach',
     location: 'Miami Beach, FL · Ocean Drive',
     pricePerDay: 9.5,
@@ -123,7 +123,7 @@ export const LISTINGS: Listing[] = [
   },
   {
     id: 'lst_007',
-    type: 'business-front',
+    type: 'storefront',
     title: 'NYC Boutique Window Display',
     location: 'New York, NY · SoHo District',
     pricePerDay: 3.1,
@@ -139,7 +139,7 @@ export const LISTINGS: Listing[] = [
   },
   {
     id: 'lst_008',
-    type: 'aerial',
+    type: 'mobile',
     title: 'Banner Plane — SoCal Coastline',
     location: 'San Diego, CA · Pacific Beach',
     pricePerDay: 5.5,
@@ -158,19 +158,19 @@ export const LISTINGS: Listing[] = [
 export const TYPE_ICONS: Record<ListingType, string> = {
   'video-game': '🎮',
   billboard:    '📺',
-  streamer:     '📡',
-  website:           '🌐',
-  aerial:            '✈️',
-  'business-front':  '🏬',
+  'stream-tv':  '📡',
+  website:      '🌐',
+  mobile:       '🛸',
+  storefront:   '🏪',
 };
 
 export const TYPE_LABELS: Record<ListingType, string> = {
   'video-game': 'Video Game',
   billboard: 'Billboard',
-  streamer: 'Streamer',
+  'stream-tv': 'Stream/TV',
   website: 'Website',
-  aerial: 'Aerial',
-  'business-front': 'Business Front',
+  mobile: 'Mobile',
+  storefront: 'Storefront',
 };
 
 export const PUBLISHER_LABELS: Record<PublisherType, string> = {

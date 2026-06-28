@@ -9,7 +9,7 @@
 ## 1. Product context (for a cold session)
 
 **Screen Sync** is a peer-to-peer advertising marketplace on Solana. Anyone lists an ad
-space (website banner, in-game billboard, streamer overlay, casino/boutique screen, aerial,
+space (website banner, in-game billboard, stream/TV overlay, storefront screen, mobile/aerial,
 etc.); advertisers book it directly; settlement happens on-chain. Media (ad creatives) is
 stored on IPFS via Pinata, with the content ID (CID) anchored on-chain.
 
@@ -23,7 +23,7 @@ The product spans **two separate codebases** (do not merge them):
 
 **Current dApp state (already built, all mock):**
 - Listings browse at `/` (root); detail at `/marketplace/[id]`.
-- 8 mock listings in `lib/mockData.ts` (types: video-game, billboard, streamer, website, business-front, aerial).
+- 8 mock listings in `lib/mockData.ts` (types: video-game, billboard, stream-tv, website, storefront, mobile).
 - **Contract Builder** (`components/contract/`) on each listing — two booking modes:
   - **Slot**: reserve exclusive time blocks (8 × 3-hour blocks/day) via an availability calendar.
   - **Filler**: run the ad in the gaps between booked slots at a frequency tier (Low/Med/High).

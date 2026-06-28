@@ -60,10 +60,10 @@
 }
 .media[data-type='video-game'] { background: linear-gradient(135deg, #120824 0%, #2d1b69 55%, #0a0420 100%); }
 .media[data-type='billboard']  { background: linear-gradient(135deg, #180800 0%, #6b2d0a 55%, #3a0a00 100%); }
-.media[data-type='streamer']   { background: linear-gradient(135deg, #050f2e 0%, #0f2460 55%, #020b1e 100%); }
+.media[data-type='stream-tv']  { background: linear-gradient(135deg, #050f2e 0%, #0f2460 55%, #020b1e 100%); }
 .media[data-type='website']    { background: linear-gradient(135deg, #021510 0%, #064830 55%, #010e09 100%); }
-.media[data-type='aerial']         { background: linear-gradient(135deg, #020d18 0%, #0a3050 55%, #010a12 100%); }
-.media[data-type='business-front'] { background: linear-gradient(135deg, #1a0f00 0%, #6b3a00 55%, #120a00 100%); }
+.media[data-type='mobile']         { background: linear-gradient(135deg, #020d18 0%, #0a3050 55%, #010a12 100%); }
+.media[data-type='storefront']     { background: linear-gradient(135deg, #1a0f00 0%, #6b3a00 55%, #120a00 100%); }
 
 .infoSection { margin-bottom: 2rem; }
 
