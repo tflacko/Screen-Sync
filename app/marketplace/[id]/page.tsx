@@ -1,8 +1,11 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import type { Listing } from '@/lib/mockData';
 import { LISTINGS, PUBLISHER_LABELS, listingImage } from '@/lib/mockData';
+import { getListingById } from '@/lib/listings';
 import TypeBadge from '@/components/TypeBadge';
 import KickerLabel from '@/components/KickerLabel';
 import ContractBuilder from '@/components/contract/ContractBuilder';
@@ -16,7 +19,23 @@ function fmtImpr(n: number): string {
 
 export default function ListingDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const listing = LISTINGS.find((l) => l.id === id);
+  const [listing, setListing] = useState<Listing | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const seed = LISTINGS.find((l) => l.id === id);
+    if (seed) { setListing(seed); setLoading(false); return; }
+    let active = true;
+    setLoading(true);
+    getListingById(id)
+      .then((l) => { if (active) { setListing(l); setLoading(false); } })
+      .catch(() => { if (active) { setListing(null); setLoading(false); } });
+    return () => { active = false; };
+  }, [id]);
+
+  if (loading) {
+    return <div className={styles.notFound}><p>Loading listing…</p></div>;
+  }
 
   if (!listing) {
     return (

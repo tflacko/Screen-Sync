@@ -1,10 +1,15 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useWallet } from '@solana/wallet-adapter-react';
 import type { Listing } from '@/lib/mockData';
 import { FILLER_TIERS } from '@/lib/constants';
 import { slotBookingCost, fillerCost, type CostBreakdown } from '@/lib/pricing';
 import { getDaySlots, getFillerCapacity } from '@/lib/availability';
+import { sendTreasuryTx } from '@/lib/transactions';
+import { bookingMemo } from '@/lib/bookings';
+import { PAYMENTS_ENABLED } from '@/lib/config';
+import { txUrl } from '@/lib/explorer';
 import Button from '@/components/Button';
 import AvailabilityCalendar from './AvailabilityCalendar';
 import styles from '@/styles/ContractBuilder.module.css';
@@ -17,6 +22,7 @@ const daysBetween = (a: string, b: string) =>
 const ZERO: CostBreakdown = { subtotal: 0, fee: 0, total: 0 };
 
 export default function ContractBuilder({ listing }: { listing: Listing }) {
+  const { connected, publicKey, sendTransaction } = useWallet();
   const [mode, setMode] = useState<Mode>('slot');
 
   // Slot mode
@@ -30,6 +36,8 @@ export default function ContractBuilder({ listing }: { listing: Listing }) {
 
   const [signing, setSigning] = useState(false);
   const [signed, setSigned] = useState(false);
+  const [sig, setSig] = useState('');
+  const [error, setError] = useState('');
 
   const slots = useMemo(() => (date ? getDaySlots(listing.id, date) : []), [listing.id, date]);
 
@@ -73,10 +81,36 @@ export default function ContractBuilder({ listing }: { listing: Listing }) {
   }
 
   async function sign() {
+    if (!canSign) return;
+    if (!connected || !publicKey) {
+      setError('Connect your wallet to sign a contract.');
+      return;
+    }
     setSigning(true);
-    await new Promise((r) => setTimeout(r, 1200)); // mock on-chain escrow
-    setSigning(false);
-    setSigned(true);
+    setError('');
+    try {
+      const detail =
+        mode === 'slot'
+          ? `${date}:${slotIdx.join(',')}`
+          : `${rangeStart}_${rangeEnd ?? rangeStart}:${tier}`;
+      const memo = bookingMemo({ listingId: listing.id, mode, detail, total: cost.total });
+
+      let signature = '';
+      if (PAYMENTS_ENABLED) {
+        signature = await sendTreasuryTx({
+          payer: publicKey,
+          amountSol: cost.total,
+          memo,
+          sendTransaction,
+        });
+      }
+      setSig(signature);
+      setSigned(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Transaction failed');
+    } finally {
+      setSigning(false);
+    }
   }
 
   const isSelected = (d: string) => (mode === 'slot' ? d === date : d === rangeStart || d === rangeEnd);
@@ -187,14 +221,30 @@ export default function ContractBuilder({ listing }: { listing: Listing }) {
           <span>{cost.fee.toFixed(3)} SOL</span>
         </div>
         <div className={styles.totalRow}>
-          <span>Total escrow</span>
+          <span>Total payment</span>
           <span className={styles.totalVal}>{cost.total.toFixed(3)} SOL</span>
         </div>
       </div>
 
       <Button variant="cherry" full onClick={sign} disabled={!canSign || signing}>
-        {signed ? '✓ Contract Signed (Mock)' : signing ? 'Signing…' : 'Sign Contract'}
+        {signed
+          ? sig ? '✓ Contract Signed' : '✓ Contract Signed (Mock)'
+          : signing ? 'Signing…' : connected ? 'Sign Contract' : 'Connect Wallet to Sign'}
       </Button>
+
+      {error && <p className={styles.payNote} style={{ color: 'var(--cherry-bright)' }}>⚠ {error}</p>}
+      {signed && sig && (
+        <p className={styles.payNote}>
+          <a href={txUrl(sig)} target="_blank" rel="noreferrer"
+            style={{ color: 'var(--cherry-bright)', textDecoration: 'underline' }}>
+            View transaction on Solana Explorer ↗
+          </a>
+        </p>
+      )}
+      <p className={styles.payNote}>
+        Direct payment (MVP) — trustless on-chain escrow arrives with the program.
+      </p>
+
       <div className={styles.makeOffer}>
         <Button variant="ghost" full disabled={!canSign}>Save Draft</Button>
       </div>

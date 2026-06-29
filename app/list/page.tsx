@@ -3,7 +3,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { uploadToIPFS } from '@/lib/pinata';
-import { createListing } from '@/lib/solana';
+import { pinListingMetadata, listingMemo, type ListingMetadata } from '@/lib/listings';
+import { sendTreasuryTx } from '@/lib/transactions';
+import { PAYMENTS_ENABLED } from '@/lib/config';
+import { LISTING_FEE_SOL } from '@/lib/constants';
+import { txUrl } from '@/lib/explorer';
 import type { ListingType } from '@/lib/mockData';
 import { TYPE_LABELS, TYPE_ICONS } from '@/lib/mockData';
 import KickerLabel from '@/components/KickerLabel';
@@ -15,7 +19,7 @@ const ALL_TYPES = Object.keys(TYPE_LABELS) as ListingType[];
 const STEPS = ['Type', 'Details', 'Media', 'Submit'];
 
 export default function CreateListingPage() {
-  const { connected } = useWallet();
+  const { connected, publicKey, sendTransaction } = useWallet();
   const [mounted, setMounted] = useState(false);
   const [step, setStep] = useState(0);
   const [type, setType] = useState<ListingType | null>(null);
@@ -25,6 +29,7 @@ export default function CreateListingPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [txHash, setTxHash] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -61,11 +66,45 @@ export default function CreateListingPage() {
   }
 
   async function handleSubmit() {
+    if (!publicKey) { setSubmitError('Wallet not connected'); return; }
     setSubmitting(true);
-    const tx = await createListing({ type: type!, ...form, ipfsCid: cid });
-    setTxHash(tx);
-    setStep(4);
-    setSubmitting(false);
+    setSubmitError('');
+    try {
+      // 1. Pin the listing metadata to IPFS.
+      const meta: ListingMetadata = {
+        v: 1,
+        type: type!,
+        title: form.title,
+        location: form.location,
+        pricePerDay: parseFloat(form.price) || 0,
+        description: form.description,
+        tags: [],
+        audience: '',
+        impressionsPerDay: 0,
+        publisherType: 'commercial',
+        mediaCid: cid,
+        owner: publicKey.toBase58(),
+        createdAt: Date.now(),
+      };
+      const metadataCid = await pinListingMetadata(meta);
+
+      // 2. Anchor the metadata CID on-chain (skipped in mock mode without a treasury).
+      let sig = '';
+      if (PAYMENTS_ENABLED) {
+        sig = await sendTreasuryTx({
+          payer: publicKey,
+          amountSol: LISTING_FEE_SOL,
+          memo: listingMemo(metadataCid),
+          sendTransaction,
+        });
+      }
+      setTxHash(sig);
+      setStep(4);
+    } catch (e) {
+      setSubmitError(e instanceof Error ? e.message : 'Submission failed');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -199,10 +238,16 @@ export default function CreateListingPage() {
                 <span style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '0.9rem' }}>{v}</span>
               </div>
             ))}
+            <p style={{ color: 'var(--beige-dim)', fontSize: '0.8rem', marginTop: '1rem', lineHeight: 1.6 }}>
+              {PAYMENTS_ENABLED
+                ? `Registers your listing on-chain (≈ ${LISTING_FEE_SOL} SOL network/registry fee). Metadata is stored on IPFS.`
+                : 'Mock mode: metadata is pinned but no on-chain tx is sent (set a treasury address to go live).'}
+            </p>
+            {submitError && <div className={styles.uploadError}>⚠ {submitError}</div>}
             <div className={styles.actions} style={{ marginTop: '1.5rem' }}>
               <Button variant="ghost" onClick={() => setStep(2)}>← Back</Button>
               <Button variant="cherry" onClick={handleSubmit} disabled={submitting}>
-                {submitting ? 'Submitting…' : 'Submit On-Chain'}
+                {submitting ? 'Submitting…' : PAYMENTS_ENABLED ? 'Submit On-Chain' : 'Submit (Mock)'}
               </Button>
             </div>
           </div>
@@ -214,10 +259,19 @@ export default function CreateListingPage() {
             <div className={styles.successIcon}>✅</div>
             <div className={styles.successTitle}>Listing Submitted!</div>
             <p className={styles.successSub}>
-              Your listing has been submitted to the Solana devnet (mock). It will appear in the marketplace once confirmed on-chain.
+              {txHash
+                ? 'Your listing is registered on-chain and will appear in the marketplace.'
+                : 'Mock submission complete. Configure a treasury + Pinata to register on-chain.'}
             </p>
             <Button href="/" variant="cherry">Browse Marketplace</Button>
-            <div className={styles.mockTx}>Mock TX: {txHash}</div>
+            {txHash ? (
+              <a className={styles.mockTx} href={txUrl(txHash)} target="_blank" rel="noreferrer"
+                style={{ color: 'var(--cherry-bright)', textDecoration: 'underline' }}>
+                View transaction on Solana Explorer ↗
+              </a>
+            ) : (
+              <div className={styles.mockTx}>Mock submission (no on-chain tx)</div>
+            )}
           </div>
         )}
       </div>
