@@ -9,6 +9,12 @@ const PINATA_JSON_URL = 'https://api.pinata.cloud/pinning/pinJSONToIPFS';
 const MAX_METADATA_BYTES = 50_000;
 
 export async function POST(req: NextRequest) {
+  // Reject oversized bodies before parsing them into memory (DoS guard).
+  const contentLength = Number(req.headers.get('content-length') || 0);
+  if (contentLength > MAX_METADATA_BYTES + 4096) {
+    return NextResponse.json({ error: 'Metadata too large' }, { status: 413 });
+  }
+
   let body: unknown;
   try {
     body = await req.json();

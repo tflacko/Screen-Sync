@@ -11,12 +11,18 @@
 // marketplace is never empty. Everything degrades to seed-only in mock mode.
 import type { ParsedTransactionWithMeta } from '@solana/web3.js';
 import type { Listing, ListingType, PublisherType } from './mockData';
-import { LISTINGS } from './mockData';
+import { LISTINGS, TYPE_LABELS } from './mockData';
 import { getConnection, getTreasury } from './connection';
 import { ipfsUrl } from './pinata';
 
 const LISTING_MEMO_PREFIX = 'ss:list:v1:';
 const SCAN_LIMIT = 200;
+// Cap how many on-chain listings we resolve per scan — bounds IPFS fetches and
+// limits griefing (someone spamming registry memos can't unbounded-load the UI).
+const MAX_RESULTS = 60;
+
+const isListingType = (t: unknown): t is ListingType =>
+  typeof t === 'string' && Object.prototype.hasOwnProperty.call(TYPE_LABELS, t);
 
 /** Shape pinned to IPFS for each listing. */
 export interface ListingMetadata {
@@ -76,7 +82,9 @@ async function fetchMetadata(cid: string): Promise<ListingMetadata | null> {
   }
 }
 
-function metaToListing(cid: string, owner: string, m: ListingMetadata): Listing {
+function metaToListing(cid: string, owner: string, m: ListingMetadata): Listing | null {
+  // Untrusted IPFS metadata — validate the type before it reaches icon/CSS lookups.
+  if (!isListingType(m.type)) return null;
   return {
     id: cid,
     type: m.type,
@@ -112,6 +120,7 @@ export async function getOnChainListings(): Promise<Listing[]> {
     const seen = new Set<string>();
     const pending: Promise<Listing | null>[] = [];
     for (const tx of txs) {
+      if (pending.length >= MAX_RESULTS) break;
       if (!tx || tx.meta?.err) continue;
       const memo = extractMemo(tx);
       if (!memo || !memo.startsWith(LISTING_MEMO_PREFIX)) continue;

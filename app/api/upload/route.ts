@@ -21,6 +21,12 @@ function validate(type: string, header: Uint8Array, size: number): string | null
 }
 
 export async function POST(req: NextRequest) {
+  // Reject oversized bodies before reading them into memory (DoS guard).
+  const contentLength = Number(req.headers.get('content-length') || 0);
+  if (contentLength > MAX_FILE_SIZE + 4096) {
+    return NextResponse.json({ error: 'File too large' }, { status: 413 });
+  }
+
   let file: File | null = null;
   try {
     const form = await req.formData();
@@ -31,7 +37,11 @@ export async function POST(req: NextRequest) {
   }
   if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 });
 
-  const header = new Uint8Array((await file.arrayBuffer()).slice(0, 4));
+  // Check size before reading the body; read only the first bytes for the magic check.
+  if (file.size > MAX_FILE_SIZE) {
+    return NextResponse.json({ error: 'File too large' }, { status: 413 });
+  }
+  const header = new Uint8Array(await file.slice(0, 4).arrayBuffer());
   const err = validate(file.type, header, file.size);
   if (err) return NextResponse.json({ error: err }, { status: 400 });
 
