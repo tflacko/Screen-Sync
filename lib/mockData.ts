@@ -22,6 +22,8 @@ export interface Listing {
   ipfsCid: string;
   verified: boolean;
   description: string;
+  /** Gateway URL for the creative, set for on-chain listings (IPFS-hosted media). */
+  imageUrl?: string;
 }
 
 export const LISTINGS: Listing[] = [
@@ -178,5 +180,7 @@ export const PUBLISHER_LABELS: Record<PublisherType, string> = {
   private: 'Private',
 };
 
-/** Path to a listing's preview image (generated assets live in /public/listings). */
-export const listingImage = (l: Pick<Listing, 'id'>): string => `/listings/${l.id}.jpg`;
+/** Preview image for a listing: IPFS gateway URL for on-chain listings, else the
+ *  generated local asset (seed catalog lives in /public/listings). */
+export const listingImage = (l: Pick<Listing, 'id' | 'imageUrl'>): string =>
+  l.imageUrl || `/listings/${l.id}.jpg`;

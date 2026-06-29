@@ -306,6 +306,14 @@
   color: var(--cherry-bright);
 }
 
+.payNote {
+  margin-top: 0.6rem;
+  font-size: 0.74rem;
+  line-height: 1.5;
+  color: var(--beige-dim);
+  text-align: center;
+}
+
 .makeOffer { margin-top: 0.6rem; }
 
 .ownerRow {

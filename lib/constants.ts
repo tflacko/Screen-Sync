@@ -6,6 +6,14 @@ export const LAMPORTS_PER_SOL = BigInt(1_000_000_000);
 /** Platform fee in basis points (2.5%). One flat protocol fee, no layered take-rates. */
 export const PLATFORM_FEE_BPS = 250;
 
+/**
+ * Small on-chain fee (SOL) paid when registering a listing. Doubles as anti-spam
+ * and as the transfer that anchors the listing to the treasury "registry" account
+ * so it's discoverable by scanning treasury tx history (no database needed).
+ * Set to 0 to make listing free (registration still anchors via the memo tx).
+ */
+export const LISTING_FEE_SOL = 0.001;
+
 /** Max upload size for ad creatives (5 MB). */
 export const MAX_FILE_SIZE = 5 * 1024 * 1024;
 

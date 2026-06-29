@@ -1,33 +1,19 @@
-import type { Listing } from './mockData';
-import { LISTINGS } from './mockData';
-import { bookingTotal } from './pricing';
+import { PublicKey } from '@solana/web3.js';
+import { getConnection } from './connection';
+import { SOLANA_RPC_URL } from './config';
 
-// Phase 1 (hybrid): Devnet RPC. Override via env for mainnet/custom RPC later.
-export const SOLANA_RPC =
-  process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.devnet.solana.com';
+// Back-compat: WalletProviderWrapper imports SOLANA_RPC as its RPC endpoint.
+export const SOLANA_RPC = SOLANA_RPC_URL;
 
-/** Stub: simulate creating a listing on-chain */
-export async function createListing(data: Partial<Listing>): Promise<string> {
-  console.log('[Screen Sync] createListing stub →', data);
-  await new Promise((r) => setTimeout(r, 1200));
-  return `mock_tx_${Date.now()}`;
-}
+const LAMPORTS = 1_000_000_000;
 
-/** Stub: simulate booking a listing. Real version transfers `total` (incl. protocol fee). */
-export async function bookListing(listingId: string, pricePerDay: number, days: number): Promise<string> {
-  const { base, fee, total } = bookingTotal(pricePerDay, days);
-  console.log(`[Screen Sync] bookListing stub → ${listingId} · ${days}d · base ${base} + fee ${fee} = ${total} SOL`);
-  await new Promise((r) => setTimeout(r, 1000));
-  return `mock_tx_${Date.now()}`;
-}
-
-/** Stub: fetch listings (returns mock data) */
-export async function getListings(): Promise<Listing[]> {
-  await new Promise((r) => setTimeout(r, 300));
-  return LISTINGS;
-}
-
-/** Stub: get SOL balance for a wallet */
-export async function getBalance(_walletAddress: string): Promise<number> {
-  return 42.69;
+/** Real SOL balance for a wallet. Returns 0 on any RPC/parse error. */
+export async function getBalance(walletAddress: string): Promise<number> {
+  try {
+    const lamports = await getConnection().getBalance(new PublicKey(walletAddress));
+    return lamports / LAMPORTS;
+  } catch (e) {
+    console.error('[Screen Sync] getBalance failed', e);
+    return 0;
+  }
 }
