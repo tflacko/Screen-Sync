@@ -6,7 +6,13 @@ import {
   Transaction,
   TransactionInstruction,
 } from '@solana/web3.js';
+import {
+  getAssociatedTokenAddressSync,
+  createAssociatedTokenAccountIdempotentInstruction,
+  createTransferCheckedInstruction,
+} from '@solana/spl-token';
 import { getConnection, getTreasury } from './connection';
+import { USDC_MINT, USDC_DECIMALS } from './config';
 import { solToLamports } from './format';
 
 // SPL Memo program — lets us attach a human/parseable note to a tx with no
@@ -39,6 +45,54 @@ export async function sendTreasuryTx(args: {
 
   const tx = new Transaction()
     .add(SystemProgram.transfer({ fromPubkey: args.payer, toPubkey: treasury, lamports }))
+    .add(
+      new TransactionInstruction({
+        keys: [],
+        programId: MEMO_PROGRAM_ID,
+        data: Buffer.from(args.memo, 'utf8'),
+      })
+    );
+
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+  tx.recentBlockhash = blockhash;
+  tx.feePayer = args.payer;
+
+  const signature = await args.sendTransaction(tx, connection);
+  await connection.confirmTransaction(
+    { signature, blockhash, lastValidBlockHeight },
+    'confirmed'
+  );
+  return signature;
+}
+
+/**
+ * Pay `amountUsdc` USDC to the treasury with an on-chain memo (booking record).
+ * Creates the treasury's USDC token account if needed (idempotent, payer =
+ * advertiser, ~0.002 SOL rent once). The advertiser signs one transaction:
+ * [ensure treasury ATA] + [transferChecked USDC] + [memo].
+ */
+export async function sendUsdcTreasuryTx(args: {
+  payer: PublicKey;
+  amountUsdc: number;
+  memo: string;
+  sendTransaction: SendFn;
+}): Promise<string> {
+  const treasury = getTreasury();
+  if (!treasury) throw new Error('Treasury wallet not configured');
+
+  const connection = getConnection();
+  const mint = new PublicKey(USDC_MINT);
+  const fromAta = getAssociatedTokenAddressSync(mint, args.payer);
+  const toAta = getAssociatedTokenAddressSync(mint, treasury);
+  const amount = BigInt(Math.round(args.amountUsdc * 10 ** USDC_DECIMALS));
+
+  const tx = new Transaction()
+    .add(
+      createAssociatedTokenAccountIdempotentInstruction(args.payer, toAta, treasury, mint)
+    )
+    .add(
+      createTransferCheckedInstruction(fromAta, mint, toAta, args.payer, amount, USDC_DECIMALS)
+    )
     .add(
       new TransactionInstruction({
         keys: [],

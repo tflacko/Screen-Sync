@@ -21,5 +21,16 @@ export const IPFS_GATEWAY =
 /** Treasury wallet that receives booking/listing payments (PUBLIC address). */
 export const TREASURY_ADDRESS = process.env.NEXT_PUBLIC_TREASURY_ADDRESS || '';
 
-/** Real SOL payments go live once a treasury address is configured. */
+/**
+ * USDC mint used for booking payments. Defaults to Circle's official DEVNET
+ * USDC mint (get test USDC at https://faucet.circle.com). For mainnet set
+ * NEXT_PUBLIC_USDC_MINT=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v.
+ */
+export const USDC_MINT =
+  process.env.NEXT_PUBLIC_USDC_MINT || '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
+
+/** USDC has 6 decimal places. */
+export const USDC_DECIMALS = 6;
+
+/** Real payments go live once a treasury address is configured. */
 export const PAYMENTS_ENABLED = TREASURY_ADDRESS.length > 0;

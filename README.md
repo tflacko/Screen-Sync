@@ -38,11 +38,13 @@ address + Pinata key flips it live. See [`docs/BACKEND-SETUP.md`](docs/BACKEND-S
 
 Screen Sync runs a **hybrid Solana + IPFS** model today, deliberately designed as a stepping stone toward a **fully on-chain protocol**.
 
-**Today (hybrid MVP — database-free):**
-- **Payments** → real SOL transfers on devnet (booking + listing registration), via the connected wallet, with an on-chain memo describing the deal.
-- **Listings** → metadata pinned to IPFS; the CID is anchored on-chain via the registration tx. Listings are **discovered by scanning the treasury account's tx history** — no backend database. The treasury doubles as the on-chain registry.
+**Today (self-contained hybrid MVP — database-free):**
+- **The product** → Screen Sync sells its **own** ad space (the `house_web` listing, live on the marketing site): flat **$20 USDC** exclusive **15-minute slots** (UTC) + frequency filler ($5/$10/$20 per day, Low/Medium/High rotation share).
+- **Payments** → real **USDC** transfers on devnet from the advertiser's wallet to the treasury, with an on-chain memo carrying the booking terms **and the creative's IPFS CID**. Listing registration anchors with a small SOL memo tx.
+- **Availability** → booked slots are read back from the treasury's on-chain history — the calendar shows real occupancy and slots can't be double-sold.
+- **Serving** → the marketing website embeds [`public/tag.js`](public/tag.js), which asks [`/api/ad`](app/api/ad/route.ts) what's booked for the current 15-min window: exclusive slot → weighted filler rotation → house ad.
 - **Ad creatives & media** → IPFS via Pinata; the CID is content-addressed and tamper-evident.
-- **Source of truth = chain + IPFS.** Off-chain pieces (RPC, Pinata) are caches/services, not the system of record.
+- **Source of truth = chain + IPFS.** Off-chain pieces (RPC, Pinata) are caches/services, not the system of record. No database anywhere.
 
 **The intent — gradually go fully on-chain**, in phases:
 

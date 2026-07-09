@@ -54,24 +54,40 @@ export const FILE_SIGNATURES: Record<string, number[]> = {
   'video/webm': [0x1a, 0x45, 0xdf, 0xa3],
 };
 
-// ---- Contract Builder ----
+// ---- Contract Builder — MVP pricing (USDC) ----
+//
+// The self-contained MVP sells Screen Sync's OWN ad space: exclusive 15-minute
+// slots at a flat USDC price, plus frequency-based filler. All slot windows are
+// defined in UTC so the dApp, the ad server, and the website agree on timing.
 
-/** A day is split into time blocks advertisers can reserve exclusively (3-hour blocks). */
-export const BLOCKS_PER_DAY = 8;
+/** Exclusive slot length (minutes). */
+export const SLOT_MINUTES = 15;
 
-/** An exclusive premium slot costs more than the per-day average rate. */
-export const SLOT_PREMIUM = 1.5;
+/** 15-minute slots per day (24h × 4). */
+export const SLOTS_PER_DAY = (24 * 60) / SLOT_MINUTES; // 96
+
+/** Flat price of one exclusive 15-minute slot (USDC). */
+export const SLOT_PRICE_USDC = 20;
 
 export interface FillerTier {
   id: 'low' | 'medium' | 'high';
   label: string;
-  factor: number; // fraction of pricePerDay charged per day
+  usdcPerDay: number; // flat USDC per day at this frequency
+  weight: number; // relative rotation share in the serving loop
   cadence: string; // human-readable rotation frequency
 }
 
-/** Filler runs your ad in the gaps between premium slot ads, at a chosen frequency. */
+/** Filler runs your ad in the gaps between booked slots, at a chosen frequency. */
 export const FILLER_TIERS: FillerTier[] = [
-  { id: 'low', label: 'Low', factor: 0.25, cadence: '~1 in 6 rotations' },
-  { id: 'medium', label: 'Medium', factor: 0.5, cadence: '~1 in 3 rotations' },
-  { id: 'high', label: 'High', factor: 1.0, cadence: '~every other rotation' },
+  { id: 'low', label: 'Low', usdcPerDay: 5, weight: 1, cadence: '~1 in 6 rotations' },
+  { id: 'medium', label: 'Medium', usdcPerDay: 10, weight: 2, cadence: '~1 in 3 rotations' },
+  { id: 'high', label: 'High', usdcPerDay: 20, weight: 4, cadence: '~every other rotation' },
 ];
+
+// ---- Legacy / Phase 2 program constants (SOL-denominated escrow model) ----
+
+/** Phase 2 Anchor program: blocks per day in the on-chain slot bitmap. */
+export const BLOCKS_PER_DAY = 8;
+
+/** Phase 2 Anchor program: exclusive-slot premium over the per-day average rate. */
+export const SLOT_PREMIUM = 1.5;

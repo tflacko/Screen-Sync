@@ -6,12 +6,27 @@ on-chain program and serving layer land.
 
 ## Trust model (today)
 
-- **Payments are custodial.** Bookings/listing fees transfer SOL directly to the
-  treasury wallet. There is **no on-chain escrow or refund** yet — that requires
-  the Phase 2 Anchor program. The UI states this ("direct payment (MVP)").
-- **Source of truth = chain + IPFS.** Listings are IPFS metadata with the CID
-  anchored on-chain; discovery scans the treasury account's tx history. No DB.
+- **Payments are custodial.** Bookings pay **USDC** directly to the treasury
+  wallet (listing fees pay SOL). There is **no on-chain escrow or refund** yet —
+  that requires the Phase 2 Anchor program. Acceptable for the MVP because the
+  seller IS Screen Sync (you can't rug yourself); revisit before third-party
+  listings take real money.
+- **Source of truth = chain + IPFS.** Listings, bookings, and the served
+  creative all derive from treasury tx history + IPFS. No DB.
 - **One server-side secret:** `PINATA_JWT`. Everything else is a public value.
+
+### Serving-plane notes (`/api/ad` + `tag.js`)
+- `/api/ad` is public with `Access-Control-Allow-Origin: *` by design — it
+  returns only public on-chain data. RPC load is bounded by the 60s scan cache.
+- **Creative content is attacker-influenced**: anyone who pays $20 can put an
+  image on your website. The tag renders it as an `<img>` only (no HTML/JS
+  execution), but there is **no content moderation** — a paid booking could be
+  offensive imagery. MVP mitigations: it's devnet money today; before mainnet,
+  add a moderation gate (server checks creative before serving, an allow/deny
+  list keyed by CID, or human approval for first-time advertisers).
+- Slot conflicts are checked client-side before paying and enforced at serve
+  time by "first matching booking wins"; the Phase 2 program makes conflicts
+  impossible on-chain.
 
 ## What's handled
 
