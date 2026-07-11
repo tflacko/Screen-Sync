@@ -12,8 +12,20 @@
 import type { ParsedTransactionWithMeta } from '@solana/web3.js';
 import type { Listing, ListingType, PublisherType } from './mockData';
 import { LISTINGS, TYPE_LABELS } from './mockData';
+import { LISTING_FEE_SOL } from './constants';
 import { getConnection, getTreasury } from './connection';
 import { ipfsUrl } from './pinata';
+
+/** Lamports the treasury actually received in this tx (anti-spam: a listing
+ *  memo only counts if the registry fee was really paid). */
+function lamportsReceived(tx: ParsedTransactionWithMeta, treasury: string): number {
+  if (!tx.meta) return 0;
+  const idx = tx.transaction.message.accountKeys.findIndex(
+    (k) => k.pubkey.toString() === treasury
+  );
+  if (idx < 0) return 0;
+  return (tx.meta.postBalances[idx] ?? 0) - (tx.meta.preBalances[idx] ?? 0);
+}
 
 const LISTING_MEMO_PREFIX = 'ss:list:v1:';
 const SCAN_LIMIT = 200;
@@ -117,6 +129,8 @@ export async function getOnChainListings(): Promise<Listing[]> {
       { maxSupportedTransactionVersion: 0, commitment: 'confirmed' }
     );
 
+    const treasuryStr = treasury.toBase58();
+    const minFeeLamports = Math.floor(LISTING_FEE_SOL * 1_000_000_000);
     const seen = new Set<string>();
     const pending: Promise<Listing | null>[] = [];
     for (const tx of txs) {
@@ -124,6 +138,8 @@ export async function getOnChainListings(): Promise<Listing[]> {
       if (!tx || tx.meta?.err) continue;
       const memo = extractMemo(tx);
       if (!memo || !memo.startsWith(LISTING_MEMO_PREFIX)) continue;
+      // Anti-spam: the registry fee must actually have been paid.
+      if (minFeeLamports > 0 && lamportsReceived(tx, treasuryStr) < minFeeLamports) continue;
       const cid = memo.slice(LISTING_MEMO_PREFIX.length).trim();
       if (!cid || seen.has(cid)) continue;
       seen.add(cid);

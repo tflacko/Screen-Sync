@@ -127,7 +127,9 @@ export default function ContractBuilder({ listing }: { listing: Listing }) {
     try {
       let memo: string;
       if (mode === 'slot') {
-        // Re-check for conflicts against the freshest data before paying.
+        // Re-check for conflicts against a FRESH chain scan (bypass the 60s
+        // cache) right before money moves.
+        clearBookingsCache();
         const fresh = await getListingBookings(listing.id);
         const taken = bookedSlotSet(fresh, date!);
         const clash = slotIdx.filter((i) => taken.has(i));

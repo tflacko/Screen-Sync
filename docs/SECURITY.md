@@ -24,9 +24,15 @@ on-chain program and serving layer land.
   offensive imagery. MVP mitigations: it's devnet money today; before mainnet,
   add a moderation gate (server checks creative before serving, an allow/deny
   list keyed by CID, or human approval for first-time advertisers).
-- Slot conflicts are checked client-side before paying and enforced at serve
-  time by "first matching booking wins"; the Phase 2 program makes conflicts
-  impossible on-chain.
+- **Payment verification**: a booking memo only counts if the treasury's USDC
+  token-balance delta in that same tx covers the price implied by the memo's
+  terms (computed from OUR price list, never the memo's self-reported amount).
+  Listing memos likewise require the registry fee's lamport delta. Balance
+  deltas are consensus-verified and cannot be spoofed.
+- Slot conflicts: fresh chain scan immediately before payment, and at serve
+  time the FIRST payer wins (bookings ordered oldest-first). A loser in the
+  rare same-minute race needs a manual refund until the Phase 2 program makes
+  conflicts impossible on-chain.
 
 ## What's handled
 

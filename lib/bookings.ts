@@ -10,7 +10,8 @@
 // real availability, and /api/ad reads them to decide which creative to serve.
 // All slot windows are UTC so the dApp, server, and website agree on timing.
 import type { ParsedTransactionWithMeta } from '@solana/web3.js';
-import { SLOTS_PER_DAY, FILLER_TIERS, type FillerTier } from './constants';
+import { SLOTS_PER_DAY, SLOT_PRICE_USDC, FILLER_TIERS, type FillerTier } from './constants';
+import { USDC_MINT, USDC_DECIMALS } from './config';
 import { getConnection, getTreasury } from './connection';
 
 const BOOKING_MEMO_PREFIX = 'ss:book:v2:';
@@ -109,6 +110,30 @@ function firstSigner(tx: ParsedTransactionWithMeta): string {
   return signer ? signer.pubkey.toString() : '';
 }
 
+/** Price (USDC) the parsed terms actually cost — computed from OUR price list,
+ *  never from the memo's self-reported amount. */
+function expectedPriceUsdc(b: Omit<OnChainBooking, 'advertiser' | 'signature'>): number {
+  if (b.mode === 'slot') return b.slots!.length * SLOT_PRICE_USDC;
+  const tier = FILLER_TIERS.find((t) => t.id === b.tier)!;
+  const days =
+    Math.round((Date.parse(b.endISO!) - Date.parse(b.startISO!)) / 86_400_000) + 1;
+  return tier.usdcPerDay * days;
+}
+
+/** How much USDC the treasury actually RECEIVED in this tx (post - pre balance
+ *  across the treasury's USDC token accounts). Memos are attacker-controlled;
+ *  this delta is consensus-verified and cannot be faked. */
+function usdcReceived(tx: ParsedTransactionWithMeta, treasury: string): number {
+  if (!tx.meta) return 0;
+  type TokenBalances = NonNullable<ParsedTransactionWithMeta['meta']>['preTokenBalances'];
+  const sum = (list: TokenBalances) =>
+    (list ?? [])
+      .filter((b) => b.owner === treasury && b.mint === USDC_MINT)
+      .reduce((s, b) => s + Number(b.uiTokenAmount.amount), 0);
+  const delta = sum(tx.meta.postTokenBalances) - sum(tx.meta.preTokenBalances);
+  return delta / 10 ** USDC_DECIMALS;
+}
+
 let cache: { at: number; bookings: OnChainBooking[] } | null = null;
 
 /** Drop the scan cache (call after making a booking so the UI shows it). */
@@ -132,6 +157,7 @@ export async function getTreasuryBookings(): Promise<OnChainBooking[]> {
       sigs.map((s) => s.signature),
       { maxSupportedTransactionVersion: 0, commitment: 'confirmed' }
     );
+    const treasuryStr = treasury.toBase58();
     const bookings: OnChainBooking[] = [];
     for (let i = 0; i < txs.length; i++) {
       const tx = txs[i];
@@ -140,8 +166,15 @@ export async function getTreasuryBookings(): Promise<OnChainBooking[]> {
       if (!memo) continue;
       const parsed = parseBookingMemo(memo);
       if (!parsed) continue;
+      // CRITICAL: a booking only counts if the treasury actually received the
+      // full price implied by its terms. Small epsilon absorbs float rounding.
+      const paid = usdcReceived(tx, treasuryStr);
+      if (paid + 1e-6 < expectedPriceUsdc(parsed)) continue;
       bookings.push({ ...parsed, advertiser: firstSigner(tx), signature: sigs[i].signature });
     }
+    // Oldest first: if two txs ever claim the same slot, the FIRST payer wins
+    // (consumers use find(), so earlier bookings take priority).
+    bookings.reverse();
     cache = { at: Date.now(), bookings };
     return bookings;
   } catch (e) {
