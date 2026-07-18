@@ -22,9 +22,35 @@ export interface Listing {
   ipfsCid: string;
   verified: boolean;
   description: string;
+  /** Gateway URL for the creative, set for on-chain listings (IPFS-hosted media). */
+  imageUrl?: string;
 }
 
+/**
+ * The house listing — Screen Sync's OWN website ad space. This is the real,
+ * bookable inventory of the self-contained MVP: $20 USDC 15-minute exclusive
+ * slots + frequency filler, served onto the marketing site via /api/ad + tag.js.
+ */
+export const HOUSE_LISTING_ID = 'house_web';
+
 export const LISTINGS: Listing[] = [
+  {
+    id: HOUSE_LISTING_ID,
+    type: 'website',
+    title: 'Screen Sync — Homepage Banner (Live)',
+    location: 'screensync site · above the fold',
+    pricePerDay: 20, // USDC per 15-min slot (see SLOT_PRICE_USDC)
+    tags: ['web3', 'live', 'house', 'crypto-native'],
+    impressionsPerDay: 5_000,
+    audience: 'Web3-curious founders, advertisers & publishers',
+    owner: 'Screen Sync',
+    publisherType: 'commercial',
+    ipfsCid: '',
+    verified: true,
+    description:
+      'The real deal — this banner lives on the Screen Sync marketing site and is served on-chain. Book an exclusive 15-minute slot ($20 USDC) or run filler between slots. Your creative is stored on IPFS, your payment settles on Solana, and your ad goes live on the site within a minute. This listing exists to demonstrate the full decentralized P2P advertising loop.',
+    imageUrl: '/listings/lst_004.jpg', // reuse the website-banner art until house art exists
+  },
   {
     id: 'lst_001',
     type: 'video-game',
@@ -178,5 +204,7 @@ export const PUBLISHER_LABELS: Record<PublisherType, string> = {
   private: 'Private',
 };
 
-/** Path to a listing's preview image (generated assets live in /public/listings). */
-export const listingImage = (l: Pick<Listing, 'id'>): string => `/listings/${l.id}.jpg`;
+/** Preview image for a listing: IPFS gateway URL for on-chain listings, else the
+ *  generated local asset (seed catalog lives in /public/listings). */
+export const listingImage = (l: Pick<Listing, 'id' | 'imageUrl'>): string =>
+  l.imageUrl || `/listings/${l.id}.jpg`;

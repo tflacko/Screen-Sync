@@ -161,7 +161,7 @@ Round all UI numbers; on-chain is integer lamports — convert with `lib/format.
 
 ## 9. Implementation plan (phased — aligns with the hybrid → on-chain roadmap)
 
-- **Phase 2a — Anchor core (devnet):** scaffold `screen_sync_marketplace` (Anchor); `initialize_config`, `register_listing`, `book_slot`, `book_filler`, `settle_booking`, `cancel_booking`; SOL escrow; treasury fee. Tests.
+- **Phase 2a — Anchor core (devnet):** ✅ **scaffolded in [`program/`](../program/)** — `initialize_config`, `update_config`, `register_listing`, `update_listing`, `book_slot`, `book_filler`, `settle_booking`, `cancel_booking`; SOL escrow in a per-booking PDA; 2.5% treasury fee; integer-lamport pricing mirroring `lib/pricing.ts`. **Not yet built/deployed** (needs the Anchor/Solana toolchain + deploy wallet). See [`program/README.md`](../program/README.md).
 - **Phase 2b — Metaplex assets:** create Listings + Creatives Core collections (CLI); mint listing NFT on register, contract NFT on book (Umi in `lib/solana.ts`). Pinata live in `lib/pinata.ts`.
 - **Phase 2c — wire dApp:** swap `lib/solana.ts`, `lib/availability.ts`, `lib/pinata.ts` internals to the program + DAS, keeping return shapes. Wallet already integrated (`@solana/wallet-adapter`, Phantom/Solflare).
 - **Phase 3 — serving + proof-of-display:** build `tag.js` ad tag + serving/oracle service; Bubblegum cNFT impression receipts; `record_delivery`; dispute resolution against receipts.

@@ -2,8 +2,9 @@
 
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { LISTINGS } from '@/lib/mockData';
+import type { Listing } from '@/lib/mockData';
+import { getBalance } from '@/lib/solana';
+import { getUserListings } from '@/lib/listings';
 import StatBox from '@/components/StatBox';
 import ListingCard from '@/components/ListingCard';
 import KickerLabel from '@/components/KickerLabel';
@@ -11,12 +12,22 @@ import Button from '@/components/Button';
 import WalletButton from '@/components/WalletButton';
 import styles from '@/styles/Dashboard.module.css';
 
-const MOCK_USER_LISTINGS = LISTINGS.slice(0, 3);
-
 export default function DashboardPage() {
   const { connected, publicKey } = useWallet();
   const [mounted, setMounted] = useState(false);
+  const [balance, setBalance] = useState<number | null>(null);
+  const [listings, setListings] = useState<Listing[]>([]);
+
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    if (!publicKey) return;
+    const addr = publicKey.toBase58();
+    let active = true;
+    getBalance(addr).then((b) => { if (active) setBalance(b); }).catch(() => {});
+    getUserListings(addr).then((l) => { if (active) setListings(l); }).catch(() => {});
+    return () => { active = false; };
+  }, [publicKey]);
 
   if (!mounted) return null;
 
@@ -52,10 +63,10 @@ export default function DashboardPage() {
 
       <div className={styles.body}>
         <div className={styles.statsRow}>
-          <StatBox value={3} label="Active Listings" />
-          <StatBox value={42.69} label="SOL Balance" decimals={2} />
-          <StatBox value={258000} label="Total Impressions" />
-          <StatBox value={2} label="Active Campaigns" />
+          <StatBox value={listings.length} label="Active Listings" />
+          <StatBox value={balance ?? 0} label="SOL Balance" decimals={2} />
+          <StatBox value={listings.reduce((s, l) => s + l.impressionsPerDay, 0)} label="Impressions / Day" />
+          <StatBox value={0} label="Active Campaigns" />
         </div>
 
         <div className={styles.section}>
@@ -63,9 +74,15 @@ export default function DashboardPage() {
             <h2 className={styles.sectionTitle}>Your Listings</h2>
             <Button href="/list" variant="cherry" size="sm">+ List New</Button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '1.5rem' }}>
-            {MOCK_USER_LISTINGS.map((l) => <ListingCard key={l.id} listing={l} />)}
-          </div>
+          {listings.length === 0 ? (
+            <p style={{ color: 'var(--beige-dim)', padding: '1.5rem 0', lineHeight: 1.6 }}>
+              You haven&apos;t registered any listings yet. Create one to see it here and in the marketplace.
+            </p>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '1.5rem' }}>
+              {listings.map((l) => <ListingCard key={l.id} listing={l} />)}
+            </div>
+          )}
         </div>
       </div>
     </div>

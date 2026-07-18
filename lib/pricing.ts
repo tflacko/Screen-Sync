@@ -1,6 +1,47 @@
-// Pricing — adapted from reference/legacy-react-vite/utils/pricing.ts.
-// UI works in SOL (numbers); on-chain settlement uses lamports (see lib/format.ts).
-import { PLATFORM_FEE_BPS, BLOCKS_PER_DAY, SLOT_PREMIUM } from './constants';
+// Pricing.
+//
+// MVP (self-contained, USDC): flat $20 per 15-minute exclusive slot and flat
+// USDC/day filler tiers — see the USDC section below. The SOL-denominated
+// functions further down mirror the Phase 2 Anchor program's escrow math.
+import {
+  PLATFORM_FEE_BPS,
+  BLOCKS_PER_DAY,
+  SLOT_PREMIUM,
+  SLOT_PRICE_USDC,
+  FILLER_TIERS,
+  type FillerTier,
+} from './constants';
+
+// ---- MVP: USDC pricing ------------------------------------------------------
+
+export interface UsdcCost {
+  /** Line-item description for the breakdown UI. */
+  label: string;
+  /** Total USDC due (goes to the treasury in full). */
+  totalUsdc: number;
+}
+
+/** Cost of a set of exclusive slots, given each slot's price (base $20, or
+ *  current-top-bid + increment when outbidding a booked slot). */
+export function slotsCostUsdc(perSlotPrices: number[]): UsdcCost {
+  const outbids = perSlotPrices.filter((p) => p > SLOT_PRICE_USDC).length;
+  const label =
+    outbids > 0
+      ? `${perSlotPrices.length} × 15-min slot (${outbids} outbid)`
+      : `${perSlotPrices.length} × 15-min slot @ $${SLOT_PRICE_USDC}`;
+  return { label, totalUsdc: perSlotPrices.reduce((s, p) => s + p, 0) };
+}
+
+/** Cost of a filler run over `days` days ($20/day = 15 min of airtime/day). */
+export function fillerCostUsdc(days: number, tierId: FillerTier['id']): UsdcCost {
+  const tier = FILLER_TIERS.find((t) => t.id === tierId)!;
+  return {
+    label: `${days} day${days === 1 ? '' : 's'} × filler @ $${tier.usdcPerDay}/day`,
+    totalUsdc: tier.usdcPerDay * days,
+  };
+}
+
+// ---- Phase 2 program: SOL-denominated escrow math ---------------------------
 
 /** Flat protocol fee (in SOL) on a base amount in SOL. */
 export const platformFee = (baseSol: number): number => baseSol * (PLATFORM_FEE_BPS / 10_000);

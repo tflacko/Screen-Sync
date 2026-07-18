@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  webpack: (config) => {
+  webpack: (config, { webpack }) => {
     config.resolve.fallback = {
       ...config.resolve.fallback,
       fs: false,
@@ -8,8 +8,12 @@ const nextConfig = {
       path: false,
       crypto: false,
       stream: false,
-      buffer: false,
+      // @solana/web3.js needs Buffer in the browser (tx serialization / memo).
+      buffer: require.resolve('buffer/'),
     };
+    config.plugins.push(
+      new webpack.ProvidePlugin({ Buffer: ['buffer', 'Buffer'] })
+    );
     return config;
   },
   transpilePackages: [

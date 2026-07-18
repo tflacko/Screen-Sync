@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { getDayStatus } from '@/lib/availability';
+import { getDayStatus, type DayStatus } from '@/lib/availability';
 import styles from '@/styles/ContractBuilder.module.css';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -14,9 +14,11 @@ interface Props {
   isSelected: (dateISO: string) => boolean;
   inRange?: (dateISO: string) => boolean;
   onPick: (dateISO: string) => void;
+  /** Booking-aware day status (real on-chain occupancy). Falls back to the demo mock. */
+  dayStatus?: (dateISO: string) => DayStatus;
 }
 
-export default function AvailabilityCalendar({ listingId, isSelected, inRange, onPick }: Props) {
+export default function AvailabilityCalendar({ listingId, isSelected, inRange, onPick, dayStatus }: Props) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const [view, setView] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
@@ -54,7 +56,7 @@ export default function AvailabilityCalendar({ listingId, isSelected, inRange, o
           if (!d) return <span key={i} />;
           const id = iso(d);
           const past = d < today;
-          const status = getDayStatus(listingId, id);
+          const status = dayStatus ? dayStatus(id) : getDayStatus(listingId, id);
           const disabled = past || status === 'full';
           const cls = [styles.day, styles[`day_${status}`]];
           if (disabled) cls.push(styles.dayDisabled);

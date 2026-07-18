@@ -6,6 +6,14 @@ export const LAMPORTS_PER_SOL = BigInt(1_000_000_000);
 /** Platform fee in basis points (2.5%). One flat protocol fee, no layered take-rates. */
 export const PLATFORM_FEE_BPS = 250;
 
+/**
+ * On-chain registration fee (USDC) paid when creating a listing. Anti-spam +
+ * anchors the listing to the treasury "registry" account so it's discoverable
+ * by scanning treasury tx history (no database needed). USDC-only by design:
+ * no price oracle anywhere — every price in the protocol is a fixed USDC amount.
+ */
+export const LISTING_FEE_USDC = 1;
+
 /** Max upload size for ad creatives (5 MB). */
 export const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
@@ -46,24 +54,57 @@ export const FILE_SIGNATURES: Record<string, number[]> = {
   'video/webm': [0x1a, 0x45, 0xdf, 0xa3],
 };
 
-// ---- Contract Builder ----
+// ---- Contract Builder — MVP pricing (USDC) ----
+//
+// The self-contained MVP sells Screen Sync's OWN ad space: exclusive 15-minute
+// slots at a flat USDC price, plus frequency-based filler. All slot windows are
+// defined in UTC so the dApp, the ad server, and the website agree on timing.
 
-/** A day is split into time blocks advertisers can reserve exclusively (3-hour blocks). */
-export const BLOCKS_PER_DAY = 8;
+/** Exclusive slot length (minutes). */
+export const SLOT_MINUTES = 15;
 
-/** An exclusive premium slot costs more than the per-day average rate. */
-export const SLOT_PREMIUM = 1.5;
+/** 15-minute slots per day (24h × 4). */
+export const SLOTS_PER_DAY = (24 * 60) / SLOT_MINUTES; // 96
+
+/** Base price of one exclusive 15-minute slot (USDC). */
+export const SLOT_PRICE_USDC = 20;
+
+/**
+ * Outbidding (optional): a slot that's already booked can be taken by paying
+ * at least the current holder's per-slot price plus this increment. Highest
+ * verified payment wins at serve time. The outbid holder is NOT auto-refunded
+ * in the MVP (manual treasury refund) — the UI says so before paying.
+ */
+export const OUTBID_MIN_INCREMENT_USDC = 5;
+
+/**
+ * Filler: $20 buys 15 minutes TOTAL of airtime for one day, served one minute
+ * at a time spread across that day's unbooked windows.
+ */
+export const FILLER_PRICE_USDC = 20;
+export const FILLER_MINUTES_PER_DAY = 15;
 
 export interface FillerTier {
-  id: 'low' | 'medium' | 'high';
+  id: 'std';
   label: string;
-  factor: number; // fraction of pricePerDay charged per day
-  cadence: string; // human-readable rotation frequency
+  usdcPerDay: number;
+  cadence: string;
 }
 
-/** Filler runs your ad in the gaps between premium slot ads, at a chosen frequency. */
+/** Single filler product (kept as a list for memo-format compatibility). */
 export const FILLER_TIERS: FillerTier[] = [
-  { id: 'low', label: 'Low', factor: 0.25, cadence: '~1 in 6 rotations' },
-  { id: 'medium', label: 'Medium', factor: 0.5, cadence: '~1 in 3 rotations' },
-  { id: 'high', label: 'High', factor: 1.0, cadence: '~every other rotation' },
+  {
+    id: 'std',
+    label: 'Filler',
+    usdcPerDay: FILLER_PRICE_USDC,
+    cadence: `${FILLER_MINUTES_PER_DAY} min of airtime spread across the day`,
+  },
 ];
+
+// ---- Legacy / Phase 2 program constants (SOL-denominated escrow model) ----
+
+/** Phase 2 Anchor program: blocks per day in the on-chain slot bitmap. */
+export const BLOCKS_PER_DAY = 8;
+
+/** Phase 2 Anchor program: exclusive-slot premium over the per-day average rate. */
+export const SLOT_PREMIUM = 1.5;
