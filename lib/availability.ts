@@ -3,9 +3,9 @@
 // keep a deterministic mock overlay so the marketplace looks alive.
 //
 // All times are UTC: the dApp, /api/ad, and the website tag share slot windows.
-import { SLOTS_PER_DAY, SLOT_MINUTES } from './constants';
+import { SLOTS_PER_DAY, SLOT_MINUTES, SLOT_PRICE_USDC } from './constants';
 import { HOUSE_LISTING_ID, LISTINGS } from './mockData';
-import { type OnChainBooking, bookedSlotSet } from './bookings';
+import { type OnChainBooking, bookedSlotSet, slotTopBids } from './bookings';
 
 export interface TimeSlot {
   index: number;
@@ -14,6 +14,8 @@ export interface TimeSlot {
   label: string; // "09:00 – 09:15"
   status: 'available' | 'booked';
   advertiser?: string;
+  /** Current holder's per-slot bid (USDC) when booked — outbid by beating it. */
+  topBidUsdc?: number;
 }
 
 export type DayStatus = 'open' | 'partial' | 'full';
@@ -56,6 +58,7 @@ export function getDaySlots(
   bookings: OnChainBooking[] = []
 ): TimeSlot[] {
   const real = bookedSlotSet(bookings, dateISO);
+  const bids = slotTopBids(bookings, dateISO);
   const mock = mockBooked(listingId, dateISO);
   return Array.from({ length: SLOTS_PER_DAY }, (_, i) => {
     const startM = i * SLOT_MINUTES;
@@ -71,6 +74,8 @@ export function getDaySlots(
       label: `${hhmm(startM)} – ${hhmm(startM + SLOT_MINUTES)}`,
       status: booked ? 'booked' : 'available',
       advertiser: booked ? adv : undefined,
+      // Mock-booked demo slots are outbiddable at the base price.
+      topBidUsdc: booked ? bids.get(i)?.bid ?? SLOT_PRICE_USDC : undefined,
     };
   });
 }
@@ -87,7 +92,7 @@ export function getDayStatus(
   return 'partial';
 }
 
-/** Estimated filler plays available in the gaps between booked slots. */
+/** Unbooked airtime (minutes) available for filler on a given day. */
 export function getFillerCapacity(
   listingId: string,
   dateISO: string,
@@ -95,5 +100,5 @@ export function getFillerCapacity(
 ): number {
   const open =
     SLOTS_PER_DAY - bookedSlotSet(bookings, dateISO).size - mockBooked(listingId, dateISO).size;
-  return Math.max(open, 0) * 4; // ~4 filler plays per open 15-min slot
+  return Math.max(open, 0) * SLOT_MINUTES;
 }

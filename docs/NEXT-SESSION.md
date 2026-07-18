@@ -1,62 +1,56 @@
 # Next session — kickoff checklist
 
 Quick-start so a new session is productive immediately. Pairs with
-[`SMART-CONTRACTS.md`](./SMART-CONTRACTS.md) (the on-chain architecture/handoff).
+[`SMART-CONTRACTS.md`](./SMART-CONTRACTS.md) (Phase 2 on-chain architecture),
+[`BACKEND-SETUP.md`](./BACKEND-SETUP.md) (manual setup + wallet architecture),
+and [`SECURITY.md`](./SECURITY.md) (trust model + audit trail).
 
-## 1. Open the right folder
-Open **`screensync-dapp/`** as the workspace — **not** the parent or the marketing site
-(`Fable test site/`, which is a separate project / design reference only). Opening the dApp
-folder makes the preview, `.mcp.json`, and config self-contained.
+## 1. Current state (post backend-integration)
+
+The **self-contained USDC MVP** is fully wired (see PR #2 / branch
+`claude/dapp-mvp-backend-integration-aevkz2`):
+
+- **Product:** Screen Sync sells its own ad space (`house_web` listing).
+  $20 USDC / exclusive 15-min UTC slot; **outbid** = holder's bid + $5
+  (highest verified payment wins); **filler** = $20/day for 15 min of total
+  airtime spread across unbooked windows. **USDC-only — no price oracle.**
+- **Chain+IPFS, no database:** bookings are USDC transfers to the treasury
+  with memos (terms + creative CID); payment amounts are verified from token
+  balance deltas; listings are IPFS metadata anchored on-chain ($1 USDC fee).
+- **Serving:** website embeds `public/tag.js` → `/api/ad` (slot winner →
+  filler allocator → house rotation; `AD_DENYLIST_CIDS` moderation).
+- **Phase 2 scaffold:** `program/` holds the `screen_sync_marketplace` Anchor
+  program (escrow/settle/cancel) — written, NOT yet built/deployed.
 
 ## 2. First commands
 ```bash
-npm install        # restores deps (incl. @types/react overrides — keep them)
-npm run dev        # http://localhost:3001
-npm run build      # USE THIS to verify — see caveat below
+npm install
+npm run dev        # http://localhost:3001 — mock mode with zero config
+npm run build      # authoritative type-check — use this to verify
+cp .env.example .env.local   # then fill in to go live (see BACKEND-SETUP.md)
 ```
 
-## 3. Environment caveats (important for efficiency)
-- **This repo lives in OneDrive.** The Next dev server gets constant Fast-Refresh churn and the
-  in-tool screenshot/preview is flaky and sometimes 500s on a stale server. **`npm run build` is
-  the reliable source of truth** (full type-check + static gen). If the dev server misbehaves,
-  stop and restart it. For the heavy Anchor/Rust toolchain, consider a **non-OneDrive clone**.
-- **`gh` CLI is NOT installed.** Use plain `git` (Git Credential Manager handles GitHub auth via
-  a browser popup on first push). Repo: `github.com/tflacko/Screen-Sync`, branch `main`.
-  Author: Thomas Orta `<web3.w.t@gmail.com>`. Work on a feature branch → PR → `main`
-  (Netlify-style deploys ship from `main`).
-- **Build type-check gotcha (already fixed — don't undo):** the Solana mobile wallet adapter pulls
-  a nested `@types/react@19`. `package.json` `overrides` pin `@types/react`/`-dom` to 18 and
-  `components/WalletProviderWrapper.tsx` casts the providers to React-18 `FC`. `tsconfig.json`
-  excludes `reference/`. Keep these.
+## 3. What's manual (user-only) before live
+Treasury wallet address, Pinata JWT, devnet SOL+USDC in a test wallet
+(faucet.solana.com / faucet.circle.com), Netlify env vars, ad-tag snippet on
+the marketing site. Full checklist: `BACKEND-SETUP.md`.
 
-## 4. Tools available
-- **Solana MCP** (`.mcp.json`, server `solana` → https://mcp.solana.com/mcp): approve it when
-  prompted, verify with `/mcp`. Gives Solana docs search, an expert "ask for help", and
-  **`program_autofixer`** (Anchor + Pinocchio) — use it while building the program.
-- **Metaplex skill** — invoke for token-standard detail; read the specific files named in
-  `SMART-CONTRACTS.md` §3/§11 (`cli-core.md`, `sdk-core.md`, `cli-bubblegum.md`, `concepts.md`).
+## 4. Environment caveats
+- **`gh` CLI may not be installed** — use plain `git`. Repo:
+  `github.com/tflacko/Screen-Sync`. Netlify deploys from `main` only; work on
+  a feature branch → PR → merge when verified.
+- **Build type-check gotcha (fixed — don't undo):** `package.json` `overrides`
+  pin `@types/react`/`-dom` to 18; `WalletProviderWrapper.tsx` casts providers
+  to React-18 `FC`; `tsconfig.json` excludes `reference/` and `program/`.
+- Solana MCP (`.mcp.json`) available for program work; Metaplex skill for
+  Phase 2b NFT work.
 
-## 5. Decisions already locked (see SMART-CONTRACTS.md §10)
-- Payment: **SOL now, USDC-ready** (mint-agnostic escrow via `Config.accepted_mint`).
-- Listings: **transferable Core NFT + Anchor state PDA**.
-- Oracle: **centralized for now**, designed to become multi-attestor.
-- Still open (have recommendations): booking granularity, filler enforcement strictness, contract-receipt NFT.
-
-## 6. First implementation step (Phase 2a)
-Scaffold the Anchor program `screen_sync_marketplace` per `SMART-CONTRACTS.md` §4:
-`initialize_config`, `register_listing`, `book_slot`, `book_filler`, `settle_booking`,
-`cancel_booking`; SOL escrow + 2.5% treasury fee; mirror the math in `lib/pricing.ts` /
-`lib/constants.ts`. Then wire the `lib/*.ts` stubs (§6 mapping), keeping return shapes stable.
-
-## 7. File map (where things are)
-```
-app/                      pages — / (listings), /marketplace/[id], /dashboard, /list
-components/contract/      Contract Builder (slot + filler) + AvailabilityCalendar
-lib/mockData.ts           6 listing types: video-game, billboard, stream-tv, website, mobile, storefront
-lib/availability.ts       mock slot/availability model  -> becomes on-chain reads
-lib/pricing.ts            fee + slot + filler math (mirror on-chain)
-lib/constants.ts          fee bps, blocks/day, slot premium, filler tiers, file rules
-lib/solana.ts lib/pinata.ts   STUBS to replace with real program + Pinata
-reference/                old React/Vite code (reference only, excluded from build)
-docs/SMART-CONTRACTS.md   the architecture + handoff
-```
+## 5. Next implementation steps
+1. **Build + deploy the Anchor program** (`program/README.md`): needs the
+   deploy wallet + Anchor toolchain. Update it for the current pricing model
+   (USDC/SPL escrow, 96-slot bitmap → u128 or per-slot PDAs, outbid ix).
+2. **Wire the dApp to the program** once deployed (swap direct transfers for
+   `book_slot`/`book_filler`/escrow; automatic outbid refunds on-chain).
+3. **Metaplex Core NFTs** (Phase 2b): listing/creative/contract-receipt mints.
+4. **Indexer-as-cache** (Helius/DAS) when treasury scans get slow.
+5. **Proactive moderation** before mainnet (approval gate before first serve).

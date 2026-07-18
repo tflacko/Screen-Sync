@@ -25,14 +25,19 @@ on-chain program and serving layer land.
   add a moderation gate (server checks creative before serving, an allow/deny
   list keyed by CID, or human approval for first-time advertisers).
 - **Payment verification**: a booking memo only counts if the treasury's USDC
-  token-balance delta in that same tx covers the price implied by the memo's
-  terms (computed from OUR price list, never the memo's self-reported amount).
-  Listing memos likewise require the registry fee's lamport delta. Balance
-  deltas are consensus-verified and cannot be spoofed.
-- Slot conflicts: fresh chain scan immediately before payment, and at serve
-  time the FIRST payer wins (bookings ordered oldest-first). A loser in the
-  rare same-minute race needs a manual refund until the Phase 2 program makes
-  conflicts impossible on-chain.
+  token-balance delta in that same tx covers the MINIMUM price implied by the
+  memo's terms (computed from OUR price list, never the memo's self-reported
+  amount). Listing memos likewise require the $1 USDC registry fee. Balance
+  deltas are consensus-verified and cannot be spoofed. USDC-only — no price
+  oracle exists anywhere in the system.
+- **Outbidding**: a held slot is taken by paying ≥ holder's per-slot bid + $5.
+  The serve-time winner is the highest VERIFIED payment (ties keep the earlier
+  payer). The outbid holder gets a **manual treasury refund** until Phase 2
+  escrow automates it — both parties see this in the UI before paying. Track
+  refunds owed by scanning treasury history (each outbid tx names the slot).
+- **Moderation**: set `AD_DENYLIST_CIDS` (server env) to stop a creative from
+  ever serving; its windows fall back to the house ad. This is reactive — for
+  mainnet add proactive review (approval before first serve).
 
 ## What's handled
 

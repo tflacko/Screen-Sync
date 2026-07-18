@@ -3,13 +3,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import type { Listing } from '@/lib/mockData';
-import { FILLER_TIERS, SLOT_PRICE_USDC } from '@/lib/constants';
-import { slotCostUsdc, fillerCostUsdc, type UsdcCost } from '@/lib/pricing';
+import {
+  FILLER_TIERS,
+  SLOT_PRICE_USDC,
+  OUTBID_MIN_INCREMENT_USDC,
+  FILLER_PRICE_USDC,
+  FILLER_MINUTES_PER_DAY,
+} from '@/lib/constants';
+import { slotsCostUsdc, fillerCostUsdc, type UsdcCost } from '@/lib/pricing';
 import { getDaySlots, getDayStatus, getFillerCapacity } from '@/lib/availability';
 import {
   getListingBookings,
   clearBookingsCache,
-  bookedSlotSet,
   slotBookingMemo,
   fillerBookingMemo,
   type OnChainBooking,
@@ -50,7 +55,7 @@ export default function ContractBuilder({ listing }: { listing: Listing }) {
   // Filler mode
   const [rangeStart, setRangeStart] = useState<string | null>(null);
   const [rangeEnd, setRangeEnd] = useState<string | null>(null);
-  const [tier, setTier] = useState(FILLER_TIERS[1].id);
+  const tier = FILLER_TIERS[0].id; // single filler product ($20 = 15 min airtime/day)
 
   // Creative (the ad that actually gets served)
   const [creativeCid, setCreativeCid] = useState('');
@@ -70,10 +75,22 @@ export default function ContractBuilder({ listing }: { listing: Listing }) {
 
   const fillerDays = rangeStart ? (rangeEnd ? daysBetween(rangeStart, rangeEnd) + 1 : 1) : 0;
 
+  /** Price of one slot right now: base $20, or current top bid + increment when outbidding. */
+  const priceOfSlot = (i: number): number => {
+    const s = slots.find((x) => x.index === i);
+    return s?.status === 'booked'
+      ? (s.topBidUsdc ?? SLOT_PRICE_USDC) + OUTBID_MIN_INCREMENT_USDC
+      : SLOT_PRICE_USDC;
+  };
+
   const cost: UsdcCost =
     mode === 'slot'
-      ? slotIdx.length ? slotCostUsdc(slotIdx.length) : ZERO
+      ? slotIdx.length ? slotsCostUsdc(slotIdx.map(priceOfSlot)) : ZERO
       : fillerDays ? fillerCostUsdc(fillerDays, tier) : ZERO;
+
+  const outbidCount = mode === 'slot'
+    ? slotIdx.filter((i) => slots.find((x) => x.index === i)?.status === 'booked').length
+    : 0;
 
   const canSign = cost.totalUsdc > 0 && !!creativeCid;
 
@@ -127,16 +144,20 @@ export default function ContractBuilder({ listing }: { listing: Listing }) {
     try {
       let memo: string;
       if (mode === 'slot') {
-        // Re-check for conflicts against a FRESH chain scan (bypass the 60s
-        // cache) right before money moves.
+        // Re-price against a FRESH chain scan (bypass the 60s cache) right
+        // before money moves: someone may have booked or raised a bid since load.
         clearBookingsCache();
         const fresh = await getListingBookings(listing.id);
-        const taken = bookedSlotSet(fresh, date!);
-        const clash = slotIdx.filter((i) => taken.has(i));
-        if (clash.length > 0) {
+        const freshSlots = getDaySlots(listing.id, date!, fresh);
+        const required = slotIdx.reduce((sum, i) => {
+          const s = freshSlots[i];
+          return sum + (s.status === 'booked'
+            ? (s.topBidUsdc ?? SLOT_PRICE_USDC) + OUTBID_MIN_INCREMENT_USDC
+            : SLOT_PRICE_USDC);
+        }, 0);
+        if (cost.totalUsdc + 1e-6 < required) {
           setBookings(fresh);
-          setSlotIdx((prev) => prev.filter((i) => !taken.has(i)));
-          throw new Error('One or more selected slots were just booked — please reselect.');
+          throw new Error('Bids changed while you were deciding — review the updated total and sign again.');
         }
         memo = slotBookingMemo({
           listingId: listing.id,
@@ -210,8 +231,8 @@ export default function ContractBuilder({ listing }: { listing: Listing }) {
 
       <p className={styles.modeHint}>
         {mode === 'slot'
-          ? 'Reserve exclusive 15-minute windows (UTC), yours alone on the screen.'
-          : `Run your ad in the gaps between booked slots — from $${FILLER_TIERS[0].usdcPerDay} USDC/day.`}
+          ? 'Reserve exclusive 15-minute windows (UTC). Booked ones can be outbid.'
+          : `$${FILLER_PRICE_USDC} buys ${FILLER_MINUTES_PER_DAY} minutes of airtime per day, spread across unbooked windows.`}
       </p>
 
       <AvailabilityCalendar
@@ -229,16 +250,21 @@ export default function ContractBuilder({ listing }: { listing: Listing }) {
             {slots.map((s) => {
               const selected = slotIdx.includes(s.index);
               const booked = s.status === 'booked';
+              const outbidPrice = (s.topBidUsdc ?? SLOT_PRICE_USDC) + OUTBID_MIN_INCREMENT_USDC;
               return (
                 <button
                   type="button"
                   key={s.index}
-                  disabled={booked}
                   onClick={() => toggleSlot(s.index)}
-                  className={`${styles.slotRow} ${booked ? styles.slotBooked : ''} ${selected ? styles.slotSelected : ''}`}
+                  className={`${styles.slotRow} ${booked && !selected ? styles.slotBooked : ''} ${selected ? styles.slotSelected : ''}`}
+                  title={booked ? `Held at $${(s.topBidUsdc ?? SLOT_PRICE_USDC).toFixed(0)} — outbid for $${outbidPrice.toFixed(0)}` : undefined}
                 >
                   <span>{s.label}</span>
-                  <span className={styles.slotMeta}>{booked ? `Booked · ${s.advertiser}` : selected ? 'Selected' : `$${SLOT_PRICE_USDC}`}</span>
+                  <span className={styles.slotMeta}>
+                    {selected
+                      ? booked ? `Outbidding · $${outbidPrice.toFixed(0)}` : 'Selected'
+                      : booked ? `Booked · outbid $${outbidPrice.toFixed(0)}` : `$${SLOT_PRICE_USDC}`}
+                  </span>
                 </button>
               );
             })}
@@ -256,21 +282,17 @@ export default function ContractBuilder({ listing }: { listing: Listing }) {
               : 'Pick a start date on the calendar'}
           </div>
           <div className={styles.tierGrid}>
-            {FILLER_TIERS.map((t) => (
-              <button
-                type="button"
-                key={t.id}
-                onClick={() => { setTier(t.id); setSigned(false); }}
-                className={`${styles.tier} ${tier === t.id ? styles.tierActive : ''}`}
-              >
-                <span className={styles.tierLabel}>{t.label} · ${t.usdcPerDay}/d</span>
-                <span className={styles.tierCadence}>{t.cadence}</span>
-              </button>
-            ))}
+            <div className={`${styles.tier} ${styles.tierActive}`}>
+              <span className={styles.tierLabel}>${FILLER_PRICE_USDC} / day</span>
+              <span className={styles.tierCadence}>
+                {FILLER_MINUTES_PER_DAY} minutes of total airtime, one minute at a
+                time, spread across that day&apos;s unbooked windows
+              </span>
+            </div>
           </div>
           {rangeStart && (
             <p className={styles.fillerNote}>
-              ~{getFillerCapacity(listing.id, rangeStart, bookings).toLocaleString()} filler plays available on {rangeStart}.
+              ~{getFillerCapacity(listing.id, rangeStart, bookings).toLocaleString()} unbooked filler minutes on {rangeStart}.
             </p>
           )}
         </div>
@@ -335,6 +357,13 @@ export default function ContractBuilder({ listing }: { listing: Listing }) {
             View transaction on Solana Explorer ↗
           </a>
           {' '}· Your ad goes live in its booked window.
+        </p>
+      )}
+      {outbidCount > 0 && (
+        <p className={styles.payNote} style={{ color: 'var(--cherry-bright)' }}>
+          You&apos;re outbidding {outbidCount} held slot{outbidCount > 1 ? 's' : ''}. Highest
+          verified payment wins at serve time; the previous holder is refunded manually by
+          the treasury until on-chain escrow ships. They can bid back.
         </p>
       )}
       <p className={styles.payNote}>

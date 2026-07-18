@@ -30,6 +30,9 @@ export interface OnChainBooking {
   tier?: FillerTier['id'];
   creativeCid: string;
   usdc: number;
+  /** USDC the treasury VERIFIABLY received in this tx (consensus data — this,
+   *  not the memo's self-reported `usdc`, is what bids are ranked by). */
+  paidUsdc: number;
   advertiser: string;
   signature: string;
 }
@@ -64,7 +67,9 @@ export function fillerBookingMemo(args: {
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const isTier = (t: string): t is FillerTier['id'] => FILLER_TIERS.some((x) => x.id === t);
 
-export function parseBookingMemo(memo: string): Omit<OnChainBooking, 'advertiser' | 'signature'> | null {
+export function parseBookingMemo(
+  memo: string
+): Omit<OnChainBooking, 'advertiser' | 'signature' | 'paidUsdc'> | null {
   if (!memo.startsWith(BOOKING_MEMO_PREFIX) || memo.length > 512) return null;
   const parts = memo.slice(BOOKING_MEMO_PREFIX.length).split('|');
   if (parts.length !== 5) return null;
@@ -110,9 +115,9 @@ function firstSigner(tx: ParsedTransactionWithMeta): string {
   return signer ? signer.pubkey.toString() : '';
 }
 
-/** Price (USDC) the parsed terms actually cost — computed from OUR price list,
- *  never from the memo's self-reported amount. */
-function expectedPriceUsdc(b: Omit<OnChainBooking, 'advertiser' | 'signature'>): number {
+/** Minimum price (USDC) the parsed terms cost — computed from OUR price list,
+ *  never from the memo's self-reported amount. Outbids pay more than this. */
+function expectedPriceUsdc(b: Omit<OnChainBooking, 'advertiser' | 'signature' | 'paidUsdc'>): number {
   if (b.mode === 'slot') return b.slots!.length * SLOT_PRICE_USDC;
   const tier = FILLER_TIERS.find((t) => t.id === b.tier)!;
   const days =
@@ -122,8 +127,9 @@ function expectedPriceUsdc(b: Omit<OnChainBooking, 'advertiser' | 'signature'>):
 
 /** How much USDC the treasury actually RECEIVED in this tx (post - pre balance
  *  across the treasury's USDC token accounts). Memos are attacker-controlled;
- *  this delta is consensus-verified and cannot be faked. */
-function usdcReceived(tx: ParsedTransactionWithMeta, treasury: string): number {
+ *  this delta is consensus-verified and cannot be faked. Shared with the
+ *  listings registry (USDC-only protocol — no price oracle anywhere). */
+export function usdcReceived(tx: ParsedTransactionWithMeta, treasury: string): number {
   if (!tx.meta) return 0;
   type TokenBalances = NonNullable<ParsedTransactionWithMeta['meta']>['preTokenBalances'];
   const sum = (list: TokenBalances) =>
@@ -170,7 +176,12 @@ export async function getTreasuryBookings(): Promise<OnChainBooking[]> {
       // full price implied by its terms. Small epsilon absorbs float rounding.
       const paid = usdcReceived(tx, treasuryStr);
       if (paid + 1e-6 < expectedPriceUsdc(parsed)) continue;
-      bookings.push({ ...parsed, advertiser: firstSigner(tx), signature: sigs[i].signature });
+      bookings.push({
+        ...parsed,
+        paidUsdc: paid,
+        advertiser: firstSigner(tx),
+        signature: sigs[i].signature,
+      });
     }
     // Oldest first: if two txs ever claim the same slot, the FIRST payer wins
     // (consumers use find(), so earlier bookings take priority).
@@ -196,6 +207,31 @@ export function bookedSlotSet(bookings: OnChainBooking[], dateISO: string): Set<
     if (b.mode === 'slot' && b.dateISO === dateISO) for (const s of b.slots!) set.add(s);
   }
   return set;
+}
+
+/** Effective per-slot bid of a booking (verified payment ÷ slots bought). */
+export const perSlotBid = (b: OnChainBooking): number =>
+  b.mode === 'slot' && b.slots!.length > 0 ? b.paidUsdc / b.slots!.length : 0;
+
+/**
+ * Highest bid currently holding each slot of (listing, UTC date).
+ * Bookings are oldest-first, so on equal bids the FIRST payer keeps the slot
+ * (an outbid must be strictly higher — enforced in the UI via the increment).
+ */
+export function slotTopBids(
+  bookings: OnChainBooking[],
+  dateISO: string
+): Map<number, { bid: number; booking: OnChainBooking }> {
+  const top = new Map<number, { bid: number; booking: OnChainBooking }>();
+  for (const b of bookings) {
+    if (b.mode !== 'slot' || b.dateISO !== dateISO) continue;
+    const bid = perSlotBid(b);
+    for (const s of b.slots!) {
+      const cur = top.get(s);
+      if (!cur || bid > cur.bid + 1e-6) top.set(s, { bid, booking: b });
+    }
+  }
+  return top;
 }
 
 /** Filler bookings active on a UTC date. */

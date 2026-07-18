@@ -7,12 +7,12 @@ export const LAMPORTS_PER_SOL = BigInt(1_000_000_000);
 export const PLATFORM_FEE_BPS = 250;
 
 /**
- * Small on-chain fee (SOL) paid when registering a listing. Doubles as anti-spam
- * and as the transfer that anchors the listing to the treasury "registry" account
- * so it's discoverable by scanning treasury tx history (no database needed).
- * Set to 0 to make listing free (registration still anchors via the memo tx).
+ * On-chain registration fee (USDC) paid when creating a listing. Anti-spam +
+ * anchors the listing to the treasury "registry" account so it's discoverable
+ * by scanning treasury tx history (no database needed). USDC-only by design:
+ * no price oracle anywhere — every price in the protocol is a fixed USDC amount.
  */
-export const LISTING_FEE_SOL = 0.001;
+export const LISTING_FEE_USDC = 1;
 
 /** Max upload size for ad creatives (5 MB). */
 export const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -66,22 +66,39 @@ export const SLOT_MINUTES = 15;
 /** 15-minute slots per day (24h × 4). */
 export const SLOTS_PER_DAY = (24 * 60) / SLOT_MINUTES; // 96
 
-/** Flat price of one exclusive 15-minute slot (USDC). */
+/** Base price of one exclusive 15-minute slot (USDC). */
 export const SLOT_PRICE_USDC = 20;
 
+/**
+ * Outbidding (optional): a slot that's already booked can be taken by paying
+ * at least the current holder's per-slot price plus this increment. Highest
+ * verified payment wins at serve time. The outbid holder is NOT auto-refunded
+ * in the MVP (manual treasury refund) — the UI says so before paying.
+ */
+export const OUTBID_MIN_INCREMENT_USDC = 5;
+
+/**
+ * Filler: $20 buys 15 minutes TOTAL of airtime for one day, served one minute
+ * at a time spread across that day's unbooked windows.
+ */
+export const FILLER_PRICE_USDC = 20;
+export const FILLER_MINUTES_PER_DAY = 15;
+
 export interface FillerTier {
-  id: 'low' | 'medium' | 'high';
+  id: 'std';
   label: string;
-  usdcPerDay: number; // flat USDC per day at this frequency
-  weight: number; // relative rotation share in the serving loop
-  cadence: string; // human-readable rotation frequency
+  usdcPerDay: number;
+  cadence: string;
 }
 
-/** Filler runs your ad in the gaps between booked slots, at a chosen frequency. */
+/** Single filler product (kept as a list for memo-format compatibility). */
 export const FILLER_TIERS: FillerTier[] = [
-  { id: 'low', label: 'Low', usdcPerDay: 5, weight: 1, cadence: '~1 in 6 rotations' },
-  { id: 'medium', label: 'Medium', usdcPerDay: 10, weight: 2, cadence: '~1 in 3 rotations' },
-  { id: 'high', label: 'High', usdcPerDay: 20, weight: 4, cadence: '~every other rotation' },
+  {
+    id: 'std',
+    label: 'Filler',
+    usdcPerDay: FILLER_PRICE_USDC,
+    cadence: `${FILLER_MINUTES_PER_DAY} min of airtime spread across the day`,
+  },
 ];
 
 // ---- Legacy / Phase 2 program constants (SOL-denominated escrow model) ----

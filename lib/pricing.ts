@@ -21,19 +21,22 @@ export interface UsdcCost {
   totalUsdc: number;
 }
 
-/** Cost of N exclusive 15-minute slots (flat $20 each). */
-export function slotCostUsdc(slotCount: number): UsdcCost {
-  return {
-    label: `${slotCount} × 15-min slot @ $${SLOT_PRICE_USDC}`,
-    totalUsdc: SLOT_PRICE_USDC * slotCount,
-  };
+/** Cost of a set of exclusive slots, given each slot's price (base $20, or
+ *  current-top-bid + increment when outbidding a booked slot). */
+export function slotsCostUsdc(perSlotPrices: number[]): UsdcCost {
+  const outbids = perSlotPrices.filter((p) => p > SLOT_PRICE_USDC).length;
+  const label =
+    outbids > 0
+      ? `${perSlotPrices.length} × 15-min slot (${outbids} outbid)`
+      : `${perSlotPrices.length} × 15-min slot @ $${SLOT_PRICE_USDC}`;
+  return { label, totalUsdc: perSlotPrices.reduce((s, p) => s + p, 0) };
 }
 
-/** Cost of a filler run over `days` days at a tier (flat USDC/day). */
+/** Cost of a filler run over `days` days ($20/day = 15 min of airtime/day). */
 export function fillerCostUsdc(days: number, tierId: FillerTier['id']): UsdcCost {
   const tier = FILLER_TIERS.find((t) => t.id === tierId)!;
   return {
-    label: `${days} day${days === 1 ? '' : 's'} × ${tier.label} filler @ $${tier.usdcPerDay}/day`,
+    label: `${days} day${days === 1 ? '' : 's'} × filler @ $${tier.usdcPerDay}/day`,
     totalUsdc: tier.usdcPerDay * days,
   };
 }

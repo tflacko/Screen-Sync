@@ -4,9 +4,9 @@ import { useState, useRef, useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { uploadToIPFS } from '@/lib/pinata';
 import { pinListingMetadata, listingMemo, type ListingMetadata } from '@/lib/listings';
-import { sendTreasuryTx } from '@/lib/transactions';
+import { sendUsdcTreasuryTx } from '@/lib/transactions';
 import { PAYMENTS_ENABLED } from '@/lib/config';
-import { LISTING_FEE_SOL } from '@/lib/constants';
+import { LISTING_FEE_USDC } from '@/lib/constants';
 import { txUrl } from '@/lib/explorer';
 import type { ListingType } from '@/lib/mockData';
 import { TYPE_LABELS, TYPE_ICONS } from '@/lib/mockData';
@@ -88,12 +88,13 @@ export default function CreateListingPage() {
       };
       const metadataCid = await pinListingMetadata(meta);
 
-      // 2. Anchor the metadata CID on-chain (skipped in mock mode without a treasury).
+      // 2. Anchor the metadata CID on-chain via the USDC registry fee
+      //    (skipped in mock mode without a treasury).
       let sig = '';
       if (PAYMENTS_ENABLED) {
-        sig = await sendTreasuryTx({
+        sig = await sendUsdcTreasuryTx({
           payer: publicKey,
-          amountSol: LISTING_FEE_SOL,
+          amountUsdc: LISTING_FEE_USDC,
           memo: listingMemo(metadataCid),
           sendTransaction,
         });
@@ -240,7 +241,7 @@ export default function CreateListingPage() {
             ))}
             <p style={{ color: 'var(--beige-dim)', fontSize: '0.8rem', marginTop: '1rem', lineHeight: 1.6 }}>
               {PAYMENTS_ENABLED
-                ? `Registers your listing on-chain (≈ ${LISTING_FEE_SOL} SOL network/registry fee). Metadata is stored on IPFS.`
+                ? `Registers your listing on-chain ($${LISTING_FEE_USDC} USDC registry fee). Metadata is stored on IPFS.`
                 : 'Mock mode: metadata is pinned but no on-chain tx is sent (set a treasury address to go live).'}
             </p>
             {submitError && <div className={styles.uploadError}>⚠ {submitError}</div>}

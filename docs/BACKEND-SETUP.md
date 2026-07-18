@@ -1,9 +1,18 @@
 # Backend setup — your manual inputs
 
 Everything YOU must do by hand to take the self-contained MVP live on **devnet**.
-The MVP sells Screen Sync's **own** ad space (the house listing): flat **$20 USDC
-15-minute exclusive slots** + frequency filler ($5/$10/$20 per day), paid straight
-to the treasury, with the booked creative served onto the marketing website.
+The MVP sells Screen Sync's **own** ad space (the house listing), paid straight to
+the treasury, with the booked creative served onto the marketing website.
+
+**Pricing (USDC-only — no price oracle anywhere):**
+- **Exclusive slot:** $20 per 15-minute UTC window.
+- **Outbid (optional):** a held slot can be taken by paying the holder's
+  per-slot price **+ $5**. Highest verified payment wins at serve time; the
+  outbid holder is refunded **manually** from the treasury until on-chain
+  escrow ships (both parties are warned in the UI).
+- **Filler:** $20 per day buys **15 minutes of total airtime**, served one
+  minute at a time spread across that day's unbooked windows.
+- Listing registration (for third-party publishers later): $1 USDC.
 
 > **Golden rule:** you only ever paste **public** values + **one API key**.
 > Never type a wallet **private key / seed phrase** into this project, an env
@@ -85,12 +94,21 @@ Tip for the sales pitch: link the banner's caption to
 `https://YOUR-DAPP.netlify.app/marketplace/house_web` — that's the live booking
 page for the very space the visitor is looking at.
 
-## 6. Phase 2 — program (deploy) wallet — later, not needed for the MVP
+## 6. Wallet architecture — treasury, creator, program (your 3 wallets)
 
-When you're ready for trustless escrow (`program/`): create a **separate**
-deploy wallet (`solana-keygen new`), fund with devnet SOL, then follow
-`program/README.md` (`anchor build`, `keys sync`, `test`, `deploy`). Keep the
-deploy keypair offline; it's the program's upgrade authority.
+Create **three separate wallets** with distinct jobs (never reuse one for another):
+
+| Wallet | Job | Where its address goes | Risk profile |
+|--------|-----|------------------------|--------------|
+| **Treasury** | Receives ALL revenue (USDC bookings, fees). Sends manual refunds to outbid losers. | `NEXT_PUBLIC_TREASURY_ADDRESS` | Cold-ish: log in only to refund/withdraw. Its tx history IS the booking registry — don't use it for anything else or you pollute the registry scans. |
+| **Creator / ops** | Day-to-day operator: registers house listings, will mint Core NFT collections (Phase 2b), signs oracle ops later. | Nowhere yet (Phase 2 config `admin`/`oracle`) | Hot wallet, small SOL balance for gas. |
+| **Program deploy** | `anchor deploy` upgrade authority. The **program ID** itself comes from a generated keypair (`anchor keys sync`), and THIS wallet controls upgrades. | `program/Anchor.toml` provider wallet | Coldest: compromise = attacker can replace the program. Fund only when deploying. |
+
+Setup for each: Phantom (or `solana-keygen new` for the deploy wallet) → save the
+seed phrase offline → switch to **Devnet** → share only the **public address**.
+Then follow `program/README.md` (`anchor build`, `keys sync`, `test`, `deploy`)
+when you're ready to link the Phase 2 program — deploying generates the new
+program ID you asked about, and `keys sync` writes it into the code.
 
 ---
 
