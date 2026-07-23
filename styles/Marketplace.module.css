@@ -12,6 +12,30 @@
   gap: 1rem;
 }
 
+.disclaimer {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.9rem;
+  background: rgba(142, 31, 51, 0.1);
+  border: 1px solid rgba(194, 58, 82, 0.28);
+  border-radius: 10px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--beige-dim);
+}
+.disclaimerTag {
+  flex-shrink: 0;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid rgba(194, 58, 82, 0.4);
+  border-radius: 999px;
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cherry-bright);
+}
+
 .title {
   font-size: clamp(2rem, 4.5vw, 3.2rem);
   font-weight: 700;
