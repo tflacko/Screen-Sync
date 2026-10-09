@@ -1,7 +1,7 @@
 //! Screen Sync — on-chain advertising marketplace (Phase 2a core).
 //!
 //! Mirrors the dApp's pricing (`lib/pricing.ts`, `lib/constants.ts`):
-//!   * protocol fee = 2.5% (250 bps)
+//!   * protocol fee = 2.5% (250 bps), hard-capped at 5% (MAX_FEE_BPS = 500)
 //!   * slot price   = base_rate / blocks_per_day * 1.5  (SLOT_PREMIUM)
 //!   * filler price = base_rate * tier_factor * days     (0.25 / 0.5 / 1.0)
 //!
@@ -26,7 +26,12 @@ declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
 
 // ---- Protocol constants (keep in sync with lib/constants.ts) --------------
 const PLATFORM_FEE_BPS: u64 = 250; // 2.5%
+/// Hard cap on the protocol fee: 5%. Public guarantee on screensync.xyz
+/// ("one protocol fee, capped at 5%"); keep in sync with MAX_PLATFORM_FEE_BPS in lib/constants.ts.
+const MAX_FEE_BPS: u64 = 500;
 const BPS_DENOMINATOR: u64 = 10_000;
+// The fee actually charged (platform_fee) must never exceed the cap.
+const _: () = assert!(PLATFORM_FEE_BPS <= MAX_FEE_BPS);
 const SLOT_PREMIUM_NUM: u64 = 3; // 1.5x expressed as 3/2 for integer math
 const SLOT_PREMIUM_DEN: u64 = 2;
 const MAX_BLOCKS_PER_DAY: u8 = 8; // slot_bitmap is a u8
@@ -68,7 +73,7 @@ pub mod screen_sync_marketplace {
 
     /// One-time protocol setup. Signer becomes admin.
     pub fn initialize_config(ctx: Context<InitializeConfig>, fee_bps: u16, oracle: Pubkey) -> Result<()> {
-        require!(fee_bps as u64 <= BPS_DENOMINATOR, MarketError::InvalidFee);
+        require!(fee_bps as u64 <= MAX_FEE_BPS, MarketError::InvalidFee);
         let cfg = &mut ctx.accounts.config;
         cfg.admin = ctx.accounts.admin.key();
         cfg.treasury = ctx.accounts.treasury.key();
@@ -87,7 +92,7 @@ pub mod screen_sync_marketplace {
         treasury: Pubkey,
         paused: bool,
     ) -> Result<()> {
-        require!(fee_bps as u64 <= BPS_DENOMINATOR, MarketError::InvalidFee);
+        require!(fee_bps as u64 <= MAX_FEE_BPS, MarketError::InvalidFee);
         let cfg = &mut ctx.accounts.config;
         cfg.fee_bps = fee_bps;
         cfg.oracle = oracle;
@@ -526,7 +531,7 @@ pub struct Booking {
 pub enum MarketError {
     #[msg("Arithmetic overflow")]
     MathOverflow,
-    #[msg("Invalid fee (must be <= 10000 bps)")]
+    #[msg("Invalid fee (must be <= 500 bps, i.e. 5%)")]
     InvalidFee,
     #[msg("Invalid amount")]
     InvalidAmount,
