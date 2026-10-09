@@ -6,6 +6,17 @@ export const LAMPORTS_PER_SOL = BigInt(1_000_000_000);
 /** Platform fee in basis points (2.5%). One flat protocol fee, no layered take-rates. */
 export const PLATFORM_FEE_BPS = 250;
 
+/**
+ * Hard cap on the protocol fee: 5% (500 bps). This is the public guarantee on
+ * screensync.xyz ("one protocol fee, capped at 5%") and must match the on-chain
+ * `MAX_FEE_BPS` enforced by the Anchor program's `initialize_config` / `update_config`.
+ */
+export const MAX_PLATFORM_FEE_BPS = 500;
+
+if (PLATFORM_FEE_BPS > MAX_PLATFORM_FEE_BPS) {
+  throw new Error(`PLATFORM_FEE_BPS (${PLATFORM_FEE_BPS}) exceeds the 5% cap (${MAX_PLATFORM_FEE_BPS})`);
+}
+
 /** Max upload size for ad creatives (5 MB). */
 export const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
