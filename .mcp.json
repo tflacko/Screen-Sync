@@ -3,6 +3,13 @@
     "solana": {
       "type": "http",
       "url": "https://mcp.solana.com/mcp"
+    },
+    "hostinger": {
+      "command": "npx",
+      "args": ["-y", "hostinger-api-mcp@2.13.0"],
+      "env": {
+        "HOSTINGER_API_TOKEN": "${HOSTINGER_API_TOKEN}"
+      }
     }
   }
 }
