@@ -27,7 +27,7 @@ The product spans **two separate codebases** (do not merge them):
 - **Contract Builder** (`components/contract/`) on each listing — two booking modes:
   - **Slot**: reserve exclusive time blocks (8 × 3-hour blocks/day) via an availability calendar.
   - **Filler**: run the ad in the gaps between booked slots at a frequency tier (Low/Med/High).
-- Pricing in `lib/pricing.ts` (2.5% protocol fee, slot premium ×1.5, filler factors).
+- Pricing in `lib/pricing.ts` (3% protocol fee today, within the 3–7% band; slot premium ×1.5, filler factors).
 - Create-listing flow at `/list` with file validation + mock IPFS upload.
 
 ---
@@ -54,7 +54,7 @@ and reports impressions; the program settles funds and mints proof-of-display.
 | **Ad creative** | **Core NFT** (collection "Screen Sync Creatives") | Provenance + reuse across campaigns; CID in metadata. | `cli-core.md`, `metadata-json.md` |
 | **Booking / contract** | **Anchor PDA** (escrow + terms) **+ Core NFT receipt** minted to advertiser | Program owns escrow/terms; the Core "Contract" NFT is the advertiser's transferable proof. | `sdk-core.md` (mint), Anchor §6 |
 | **Proof-of-display** | **Bubblegum cNFT** per delivery batch | Thousands of impression receipts at minimal cost. | `cli-bubblegum.md`, `sdk-bubblegum.md` |
-| **Protocol fee / treasury** | **Anchor PDA** | 2.5% (250 bps, see `lib/constants.ts`) collected on settle. | Anchor §6 |
+| **Protocol fee / treasury** | **Anchor PDA** | 3% today (300 bps), variable within **3–7%** and **hard-capped at 7% (700 bps)** on-chain — see `lib/constants.ts`. Collected on settle. | Anchor §6 |
 | *(future)* **$SCREEN token** | **Genesis** (bonding curve or launchpool) | Fair launch if/when a protocol token ships. | `cli-genesis.md`, `sdk-genesis.md` |
 | *(future)* **Filler-optimizer agent** | **Agent Registry** (Core asset + delegated executive) | The planned algorithm/LLM that auto-places filler can be an on-chain agent acting for advertisers. | `cli-agent.md`, `sdk-agent.md` |
 
@@ -69,7 +69,7 @@ and reports impressions; the program settles funds and mints proof-of-display.
 The custom marketplace logic Metaplex doesn't provide. Single program, multiple account types.
 
 ### Accounts (PDAs)
-- **Config** — `["config"]`: admin pubkey, `fee_bps` (250), treasury, accepted mint (SOL or USDC), pause flag.
+- **Config** — `["config"]`: admin pubkey, `fee_bps` (300 default, program-enforced 300–700, i.e. 3–7%), treasury, accepted mint (SOL or USDC), pause flag.
 - **Listing** — `["listing", core_asset]`: links to the Core listing NFT; owner; `base_rate` (lamports/day); `blocks_per_day` (8); `booking_mode` (exclusive | rotating); `max_advertisers`; per-date **availability ledger** (slot bitmap + filler usage). Large/rolling state → consider one **DayLedger** PDA per `(listing, date)` to bound account size: `["day", listing, date_u32]` with an 8-bit slot bitmap + filler counter.
 - **Booking** — `["booking", listing, advertiser, nonce]`: kind (slot | filler), date range, slot indices / filler tier, amount, escrow balance, status (escrowed | live | settled | refunded | disputed), creative CID, contract NFT mint.
 - **Treasury** — `["treasury"]`: accrued protocol fees.
@@ -90,7 +90,7 @@ The custom marketplace logic Metaplex doesn't provide. Single program, multiple 
 
 ### Escrow & fee
 Escrow held in the Booking PDA (SOL) or an associated token account (USDC). On `settle_booking`:
-`publisher += amount − fee; treasury += fee` where `fee = amount × 250 / 10_000`.
+`publisher += amount − fee; treasury += fee` where `fee = amount × fee_bps / 10_000` (`fee_bps` = 300 today, never above 700).
 
 Mirror the dApp math exactly: see `lib/pricing.ts` (`slotPrice`, `slotBookingCost`, `fillerCost`, `platformFee`) and `lib/constants.ts` (`PLATFORM_FEE_BPS`, `BLOCKS_PER_DAY`, `SLOT_PREMIUM`, `FILLER_TIERS`).
 
@@ -130,7 +130,7 @@ This is the core handoff goal: connect real website ad spaces to dApp bookings.
    `tag.js` (new, to build) calls a **serving endpoint** (or reads chain directly via RPC/DAS) for the creative currently booked for this listing at the current time slot — or, if no premium slot is active, the next **filler** creative in rotation.
 3. **Serve** — the tag renders the creative (image/video) from the IPFS gateway (`IPFS_GATEWAY` in `lib/pinata.ts`).
 4. **Measure** — the tag reports a viewable impression to the serving/oracle service.
-5. **Prove + settle** — the oracle batches impressions into **Bubblegum cNFTs** (proof-of-display), calls `record_delivery`, and once a booking's delivery is complete, `settle_booking` releases escrow to the publisher (minus 2.5%).
+5. **Prove + settle** — the oracle batches impressions into **Bubblegum cNFTs** (proof-of-display), calls `record_delivery`, and once a booking's delivery is complete, `settle_booking` releases escrow to the publisher (minus the protocol fee — 3% today, never more than 7%).
 
 **Trust model:** start with a **centralized Screen Sync oracle** signing delivery (fast to ship), then decentralize (multiple attestors / verifiable measurement) in a later phase. Document the oracle key in Config.
 
@@ -161,7 +161,7 @@ Round all UI numbers; on-chain is integer lamports — convert with `lib/format.
 
 ## 9. Implementation plan (phased — aligns with the hybrid → on-chain roadmap)
 
-- **Phase 2a — Anchor core (devnet):** ✅ **scaffolded in [`program/`](../program/)** — `initialize_config`, `update_config`, `register_listing`, `update_listing`, `book_slot`, `book_filler`, `settle_booking`, `cancel_booking`; SOL escrow in a per-booking PDA; 2.5% treasury fee; integer-lamport pricing mirroring `lib/pricing.ts`. **Not yet built/deployed** (needs the Anchor/Solana toolchain + deploy wallet). See [`program/README.md`](../program/README.md).
+- **Phase 2a — Anchor core (devnet):** ✅ **scaffolded in [`program/`](../program/)** — `initialize_config`, `update_config`, `register_listing`, `update_listing`, `book_slot`, `book_filler`, `settle_booking`, `cancel_booking`; SOL escrow in a per-booking PDA; 3–7% treasury fee (capped at 7%); integer-lamport pricing mirroring `lib/pricing.ts`. **Not yet built/deployed** (needs the Anchor/Solana toolchain + deploy wallet). See [`program/README.md`](../program/README.md).
 - **Phase 2b — Metaplex assets:** create Listings + Creatives Core collections (CLI); mint listing NFT on register, contract NFT on book (Umi in `lib/solana.ts`). Pinata live in `lib/pinata.ts`.
 - **Phase 2c — wire dApp:** swap `lib/solana.ts`, `lib/availability.ts`, `lib/pinata.ts` internals to the program + DAS, keeping return shapes. Wallet already integrated (`@solana/wallet-adapter`, Phantom/Solflare).
 - **Phase 3 — serving + proof-of-display:** build `tag.js` ad tag + serving/oracle service; Bubblegum cNFT impression receipts; `record_delivery`; dispute resolution against receipts.

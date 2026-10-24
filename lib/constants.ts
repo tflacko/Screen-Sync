@@ -3,18 +3,22 @@
 
 export const LAMPORTS_PER_SOL = BigInt(1_000_000_000);
 
-/** Platform fee in basis points (2.5%). One flat protocol fee, no layered take-rates. */
-export const PLATFORM_FEE_BPS = 250;
+/** Platform fee in basis points (3%). One protocol fee, no layered take-rates. */
+export const PLATFORM_FEE_BPS = 300;
 
 /**
- * Hard cap on the protocol fee: 5% (500 bps). This is the public guarantee on
- * screensync.xyz ("one protocol fee, capped at 5%") and must match the on-chain
- * `MAX_FEE_BPS` enforced by the Anchor program's `initialize_config` / `update_config`.
+ * The protocol fee is variable within 3–7% (300–700 bps) and hard-capped at 7%.
+ * This is the public guarantee on screensync.xyz ("one fee of 3–7%, capped at 7%")
+ * and must match the on-chain `MIN_FEE_BPS` / `MAX_FEE_BPS` enforced by the Anchor
+ * program's `initialize_config` / `update_config`.
  */
-export const MAX_PLATFORM_FEE_BPS = 500;
+export const MIN_PLATFORM_FEE_BPS = 300;
+export const MAX_PLATFORM_FEE_BPS = 700;
 
-if (PLATFORM_FEE_BPS > MAX_PLATFORM_FEE_BPS) {
-  throw new Error(`PLATFORM_FEE_BPS (${PLATFORM_FEE_BPS}) exceeds the 5% cap (${MAX_PLATFORM_FEE_BPS})`);
+if (PLATFORM_FEE_BPS < MIN_PLATFORM_FEE_BPS || PLATFORM_FEE_BPS > MAX_PLATFORM_FEE_BPS) {
+  throw new Error(
+    `PLATFORM_FEE_BPS (${PLATFORM_FEE_BPS}) is outside the 3–7% band (${MIN_PLATFORM_FEE_BPS}–${MAX_PLATFORM_FEE_BPS})`
+  );
 }
 
 /**

@@ -1,7 +1,7 @@
 # screen_sync_marketplace — Anchor program (Phase 2)
 
 On-chain marketplace logic for Screen Sync: listing registration, slot/filler
-bookings, **SOL escrow**, and **2.5% protocol fee** settlement. This is the
+bookings, **SOL escrow**, and **3–7% protocol fee** (capped at 7%) settlement. This is the
 trustless layer that replaces the MVP's custodial direct-transfer payments.
 
 > **Status: scaffold.** Code is written but **not yet built/deployed** — that
@@ -58,7 +58,7 @@ this for you; commit the change.
 | `settle_booking` | oracle/admin | Publisher gets amount, treasury gets fee, booking closes. |
 | `cancel_booking` | advertiser | Pre-start refund (escrow + rent); frees slots. |
 
-Pricing mirrors `lib/pricing.ts` / `lib/constants.ts` exactly (250 bps fee, 8
+Pricing mirrors `lib/pricing.ts` / `lib/constants.ts` exactly (300 bps fee, 8
 blocks/day, 1.5× slot premium, filler tiers 25/50/100%). All math is integer
 lamports with checked arithmetic.
 

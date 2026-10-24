@@ -43,11 +43,11 @@ describe("screen_sync_marketplace", () => {
 
   it("initializes config", async () => {
     await program.methods
-      .initializeConfig(250, oracle.publicKey)
+      .initializeConfig(300, oracle.publicKey)
       .accounts({ admin: admin.publicKey, treasury: treasury.publicKey })
       .rpc();
     const cfg = await program.account.config.fetch(configPda);
-    assert.equal(cfg.feeBps, 250);
+    assert.equal(cfg.feeBps, 300);
     assert.ok(cfg.treasury.equals(treasury.publicKey));
   });
 
@@ -87,10 +87,10 @@ describe("screen_sync_marketplace", () => {
       .rpc();
 
     const b = await program.account.booking.fetch(bookingPda);
-    // slotPrice = baseRate/8 * 1.5 ; amount = slotPrice * 2 ; fee = 2.5%
+    // slotPrice = baseRate/8 * 1.5 ; amount = slotPrice * 2 ; fee = 3%
     const slotPrice = Math.floor((baseRate * 3) / (blocksPerDay * 2));
     const amount = slotPrice * 2;
-    const fee = Math.floor((amount * 250) / 10_000);
+    const fee = Math.floor((amount * 300) / 10_000);
     assert.equal(b.amount.toString(), amount.toString());
     assert.equal(b.fee.toString(), fee.toString());
     assert.equal(b.escrow.toString(), (amount + fee).toString());
