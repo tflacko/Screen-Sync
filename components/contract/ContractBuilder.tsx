@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import type { Listing } from '@/lib/mockData';
-import { FILLER_TIERS } from '@/lib/constants';
+import { FILLER_TIERS, PLATFORM_FEE_BPS } from '@/lib/constants';
 import { slotBookingCost, fillerCost, type CostBreakdown } from '@/lib/pricing';
 import { getDaySlots, getFillerCapacity } from '@/lib/availability';
 import Button from '@/components/Button';
@@ -183,7 +183,7 @@ export default function ContractBuilder({ listing }: { listing: Listing }) {
           <span>{cost.subtotal.toFixed(3)} SOL</span>
         </div>
         <div className={styles.row}>
-          <span>Protocol fee (2.5%)</span>
+          <span>Protocol fee ({PLATFORM_FEE_BPS / 100}%)</span>
           <span>{cost.fee.toFixed(3)} SOL</span>
         </div>
         <div className={styles.totalRow}>

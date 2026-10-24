@@ -45,7 +45,7 @@ npm run build      # USE THIS to verify — see caveat below
 ## 6. First implementation step (Phase 2a)
 Scaffold the Anchor program `screen_sync_marketplace` per `SMART-CONTRACTS.md` §4:
 `initialize_config`, `register_listing`, `book_slot`, `book_filler`, `settle_booking`,
-`cancel_booking`; SOL escrow + 2.5% treasury fee; mirror the math in `lib/pricing.ts` /
+`cancel_booking`; SOL escrow + 3–7% treasury fee (capped at 7%); mirror the math in `lib/pricing.ts` /
 `lib/constants.ts`. Then wire the `lib/*.ts` stubs (§6 mapping), keeping return shapes stable.
 
 ## 7. File map (where things are)

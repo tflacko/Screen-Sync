@@ -27,7 +27,7 @@ The product spans **two separate codebases** (do not merge them):
 - **Contract Builder** (`components/contract/`) on each listing — two booking modes:
   - **Slot**: reserve exclusive time blocks (8 × 3-hour blocks/day) via an availability calendar.
   - **Filler**: run the ad in the gaps between booked slots at a frequency tier (Low/Med/High).
-- Pricing in `lib/pricing.ts` (2.5% protocol fee, slot premium ×1.5, filler factors).
+- Pricing in `lib/pricing.ts` (3% protocol fee today, within the 3–7% band; slot premium ×1.5, filler factors).
 - Create-listing flow at `/list` with file validation + mock IPFS upload.
 
 ---
@@ -54,7 +54,7 @@ and reports impressions; the program settles funds and mints proof-of-display.
 | **Ad creative** | **Core NFT** (collection "Screen Sync Creatives") | Provenance + reuse across campaigns; CID in metadata. | `cli-core.md`, `metadata-json.md` |
 | **Booking / contract** | **Anchor PDA** (escrow + terms) **+ Core NFT receipt** minted to advertiser | Program owns escrow/terms; the Core "Contract" NFT is the advertiser's transferable proof. | `sdk-core.md` (mint), Anchor §6 |
 | **Proof-of-display** | **Bubblegum cNFT** per delivery batch | Thousands of impression receipts at minimal cost. | `cli-bubblegum.md`, `sdk-bubblegum.md` |
-| **Protocol fee / treasury** | **Anchor PDA** | 2.5% today (250 bps), **hard-capped at 5% (500 bps)** on-chain — see `lib/constants.ts` (`PLATFORM_FEE_BPS`, `MAX_PLATFORM_FEE_BPS`). Collected on settle. | Anchor §6 |
+| **Protocol fee / treasury** | **Anchor PDA** | 3% today (300 bps), variable within **3–7%** and **hard-capped at 7% (700 bps)** on-chain — see `lib/constants.ts` (`PLATFORM_FEE_BPS`, `MIN_PLATFORM_FEE_BPS`, `MAX_PLATFORM_FEE_BPS`). Collected on settle. | Anchor §6 |
 | *(future)* **$SCREEN token** | **Genesis** (bonding curve or launchpool) | Fair launch if/when a protocol token ships. | `cli-genesis.md`, `sdk-genesis.md` |
 | *(future)* **Filler-optimizer agent** | **Agent Registry** (Core asset + delegated executive) | The planned algorithm/LLM that auto-places filler can be an on-chain agent acting for advertisers. | `cli-agent.md`, `sdk-agent.md` |
 
@@ -69,7 +69,7 @@ and reports impressions; the program settles funds and mints proof-of-display.
 The custom marketplace logic Metaplex doesn't provide. Single program, multiple account types.
 
 ### Accounts (PDAs)
-- **Config** — `["config"]`: admin pubkey, `fee_bps` (250 default; the program rejects anything above `MAX_FEE_BPS` = 500, i.e. 5%), treasury, accepted mint (SOL or USDC), pause flag.
+- **Config** — `["config"]`: admin pubkey, `fee_bps` (300 default; the program rejects anything outside `MIN_FEE_BPS`–`MAX_FEE_BPS` = 300–700, i.e. 3–7%), treasury, accepted mint (SOL or USDC), pause flag.
 - **Listing** — `["listing", core_asset]`: links to the Core listing NFT; owner; `base_rate` (lamports/day); `blocks_per_day` (8); `booking_mode` (exclusive | rotating); `max_advertisers`; per-date **availability ledger** (slot bitmap + filler usage). Large/rolling state → consider one **DayLedger** PDA per `(listing, date)` to bound account size: `["day", listing, date_u32]` with an 8-bit slot bitmap + filler counter.
 - **Booking** — `["booking", listing, advertiser, nonce]`: kind (slot | filler), date range, slot indices / filler tier, amount, escrow balance, status (escrowed | live | settled | refunded | disputed), creative CID, contract NFT mint.
 - **Treasury** — `["treasury"]`: accrued protocol fees.
@@ -90,11 +90,11 @@ The custom marketplace logic Metaplex doesn't provide. Single program, multiple 
 
 ### Escrow & fee
 Escrow held in the Booking PDA (SOL) or an associated token account (USDC). On `settle_booking`:
-`publisher += amount − fee; treasury += fee` where `fee = amount × fee_bps / 10_000` (`fee_bps` = 250 today).
+`publisher += amount − fee; treasury += fee` where `fee = amount × fee_bps / 10_000` (`fee_bps` = 300 today).
 
-**Fee cap (public guarantee):** `fee_bps` is admin-adjustable but can **never exceed 500 (5%)**. Enforce it in both
-`initialize_config` and `update_config` (`require!(fee_bps <= MAX_FEE_BPS)`). screensync.xyz promises "one protocol fee,
-capped at 5%" — this check is what makes that true.
+**Fee band (public guarantee):** `fee_bps` is admin-adjustable within **300–700 (3–7%)** and can **never exceed 700 (7%)**.
+Enforce it in both `initialize_config` and `update_config` (`require!(MIN_FEE_BPS <= fee_bps && fee_bps <= MAX_FEE_BPS)`).
+screensync.xyz promises "one fee of 3–7%, capped at 7%" — this check is what makes that true.
 
 Mirror the dApp math exactly: see `lib/pricing.ts` (`slotPrice`, `slotBookingCost`, `fillerCost`, `platformFee`) and `lib/constants.ts` (`PLATFORM_FEE_BPS`, `BLOCKS_PER_DAY`, `SLOT_PREMIUM`, `FILLER_TIERS`).
 
@@ -134,7 +134,7 @@ This is the core handoff goal: connect real website ad spaces to dApp bookings.
    `tag.js` (new, to build) calls a **serving endpoint** (or reads chain directly via RPC/DAS) for the creative currently booked for this listing at the current time slot — or, if no premium slot is active, the next **filler** creative in rotation.
 3. **Serve** — the tag renders the creative (image/video) from the IPFS gateway (`IPFS_GATEWAY` in `lib/pinata.ts`).
 4. **Measure** — the tag reports a viewable impression to the serving/oracle service.
-5. **Prove + settle** — the oracle batches impressions into **Bubblegum cNFTs** (proof-of-display), calls `record_delivery`, and once a booking's delivery is complete, `settle_booking` releases escrow to the publisher (minus the protocol fee — 2.5% today, never more than 5%).
+5. **Prove + settle** — the oracle batches impressions into **Bubblegum cNFTs** (proof-of-display), calls `record_delivery`, and once a booking's delivery is complete, `settle_booking` releases escrow to the publisher (minus the protocol fee — 3% today, never more than 7%).
 
 **Trust model:** start with a **centralized Screen Sync oracle** signing delivery (fast to ship), then decentralize (multiple attestors / verifiable measurement) in a later phase. Document the oracle key in Config.
 
