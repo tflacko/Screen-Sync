@@ -45,7 +45,22 @@ the marketing site. Full checklist: `BACKEND-SETUP.md`.
 - Solana MCP (`.mcp.json`) available for program work; Metaplex skill for
   Phase 2b NFT work.
 
-## 5. Next implementation steps
+## 5. Pending website (screensync.xyz, Hostinger) tasks
+
+Blocked in the cloud session until `developers.hostinger.com` and
+`screensync.xyz` are on the environment's network allowlist (Hostinger MCP is
+declared in `.mcp.json`; token comes from `HOSTINGER_API_TOKEN`).
+
+- [ ] Change the testing start date to **Q1 2027**.
+- [ ] Point the "Try now" CTA at the dApp's `/try` page (variant still to be
+      picked from `/try/a`, `/try/b`, `/try/c`).
+- [ ] Review all copy so the **MVP** (USDC-only fixed prices: $20 per 15-min
+      slot, +$5 outbid, $20/day filler; custodial treasury; devnet; Screen
+      Sync's own ad space) is clearly separate from the **full dApp** roadmap
+      (trustless escrow, open publisher listings, Metaplex NFTs,
+      proof-of-display). Nothing should imply full-dApp features are live.
+
+## 6. Next implementation steps
 1. **Build + deploy the Anchor program** (`program/README.md`): needs the
    deploy wallet + Anchor toolchain. Update it for the current pricing model
    (USDC/SPL escrow, 96-slot bitmap → u128 or per-slot PDAs, outbid ix).
